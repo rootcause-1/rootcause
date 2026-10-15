@@ -46,6 +46,13 @@ class Pipeline:
         self.spans_received = 0
         self.batches_received = 0
 
+    def reset(self) -> None:
+        """Forget buffered spans, metric history and flag state (the graph was wiped)."""
+        self.window = SpanWindow(self.cfg)
+        self.mem_hist.clear()
+        self.lag_hist.clear()
+        self.flags = None
+
     async def feed(self, ev: dict[str, Any], offset_ms: int = 0) -> None:
         if self.recorder is not None and offset_ms == 0:
             self.recorder.write(ev)

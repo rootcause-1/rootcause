@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -19,6 +20,7 @@ from pydantic import BaseModel
 
 from rootcause import facts
 from rootcause.actions import pager
+from rootcause.actions.flagd import read_config
 from rootcause.chaos.runner import ChaosRunner, load_catalogue
 from rootcause.engine import predict
 from rootcause.graph.client import get_graph
@@ -54,9 +56,31 @@ async def _start_replay(name: str) -> dict[str, Any]:
     await load_seed(S.rt.db)
     S.rt.detector.started_ms = None
     S.rt.started.clear()
+    S.rt.pipeline.reset()  # fresh span window + flag state for the new graph
     S.rt.player = Player(path, S.rt.pipeline.feed)
-    S.player_task = asyncio.ensure_future(S.rt.player.run())
+    S.player_task = asyncio.ensure_future(_replay_loop(name))
     return S.rt.player.status()
+
+
+async def _replay_loop(name: str) -> None:
+    """Warm up on a virtual clock, play the broken segment until a human approves the matching fix, play the
+    recovery, pause, then start the scenario over on a fresh graph (the public site never goes stale)."""
+    s = get_settings()
+    while True:
+        S.rt.paused = True
+        try:
+            await S.rt.player.warm(S.rt.tick, int(s.rc_tick_seconds * 1000))
+        finally:
+            S.rt.paused = False
+        await S.rt.player.run(warmed=True)
+        await asyncio.sleep(float(s.c("replay", "loop_pause_seconds", default=120)))
+        await S.rt.db.delete()
+        await ensure_indexes(S.rt.db)
+        await load_seed(S.rt.db)
+        S.rt.detector.started_ms = None
+        S.rt.started.clear()
+        S.rt.pipeline.reset()
+        S.rt.player = Player(f"{s.rc_replay_dir}/{name}.jsonl.gz", S.rt.pipeline.feed)
 
 
 @asynccontextmanager
@@ -272,6 +296,32 @@ async def record_stop() -> dict[str, Any]:
     events = S.recorder.events
     S.recorder.stop()
     return {"ok": True, "events": events}
+
+
+@app.post("/api/admin/reset")
+async def admin_reset(request: Request) -> dict[str, Any]:
+    """Fresh graph. Replay: restart the current (or default) scenario. Live: re-seed and re-learn baselines.
+    If RC_ADMIN_TOKEN is set, the request needs the header `x-admin-token`."""
+    token = os.environ.get("RC_ADMIN_TOKEN")
+    if token and request.headers.get("x-admin-token") != token:
+        raise HTTPException(403, "admin token required")
+    s = get_settings()
+    if s.rc_mode == "replay":
+        scenarios = list_scenarios(s.rc_replay_dir)
+        current = S.rt.player.name if S.rt.player else None
+        name = next((n for n in (current, s.rc_replay_scenario, *scenarios) if n and n in scenarios), None)
+        if not name:
+            raise HTTPException(404, "no replay scenarios")
+        return {"reset": True, "replay": await _start_replay(name)}
+    await S.rt.db.delete()
+    await ensure_indexes(S.rt.db)
+    await load_seed(S.rt.db)
+    S.rt.detector.started_ms = None
+    S.rt.started.clear()
+    S.rt.pipeline.reset()
+    if s.flagd_path:  # first observation of the flags = healthy baseline variants
+        await S.rt.pipeline.feed({"type": "flag_config", "ts": now_ms(), "data": read_config(s.flagd_path)})
+    return {"reset": True, "graph": S.rt.db.name}
 
 
 @app.get("/api/replay/scenarios")

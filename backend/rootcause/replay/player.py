@@ -1,6 +1,7 @@
 """Replay player: feeds a recorded scenario through the same Pipeline.feed() as live mode, time-shifted to now.
 
 Segments come from the recording's markers: healthy (start..break), broken (break..fix), recovery (fix..end).
+`warm()` fast-forwards the healthy segment on a virtual clock instead (public replay site).
 The broken segment loops until an approved action matches the recording's fix ({kind, target} on the `fix`
 marker); then playback jumps to the recovery segment. `play_fast` drives a virtual clock for golden tests.
 No graph queries of its own.
@@ -84,9 +85,26 @@ class Player:
             await self.feed(ev, offset)
         return False
 
-    async def run(self) -> None:
+    async def warm(self, tick: Callable[[int], Awaitable[Any]], tick_ms: int) -> None:
+        """Fast-forward the healthy segment on a virtual clock that ends *now*, so baselines are learned in
+        seconds instead of minutes (visitors of the public replay site should not wait 3 minutes)."""
+        self.phase = "warming"
+        events = self.seg["healthy"]
+        if not events:
+            return
+        offset = now_ms() - int(events[-1]["ts"])
+        next_tick = int(events[0]["ts"]) + offset + tick_ms
+        for ev in events:
+            while int(ev["ts"]) + offset >= next_tick:
+                await tick(next_tick)
+                next_tick += tick_ms
+            await self.feed(ev, offset)
+        await tick(next_tick)
+
+    async def run(self, warmed: bool = False) -> None:
         self.phase = "healthy"
-        await self._play(self.seg["healthy"], stop_on_fix=False)
+        if not warmed:
+            await self._play(self.seg["healthy"], stop_on_fix=False)
         self.phase = "broken"
         while not self.fixed:
             if await self._play(self.seg["broken"], stop_on_fix=True):

@@ -68,6 +68,7 @@ class Runtime:
         self.started: set[str] = set()
         self.tasks: list[asyncio.Task[Any]] = []
         self.last_error: str | None = None
+        self.paused = False  # replay warm-up drives tick() itself on a virtual clock
 
     # ------------------------------------------------------------------ tick
     async def tick(self, now: int | None = None) -> dict[str, Any]:
@@ -152,6 +153,9 @@ class Runtime:
     async def run_ticks(self) -> None:
         while True:
             t0 = time.monotonic()
+            if self.paused:
+                await asyncio.sleep(0.5)
+                continue
             try:
                 await self.tick()
                 self.last_error = None if not self.last_error or self.last_error.startswith("tick") else \

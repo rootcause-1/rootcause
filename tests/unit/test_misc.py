@@ -143,3 +143,30 @@ def test_report_uses_verdict_snapshot_over_recovered_graph():
                "impact": [{"journey": "journey:checkout", "pct": 0.47, "impacted": True}]}
     md = render(inc, ["payment"], [], None, verdict)
     assert "`checkout` → `payment`" in md and "journey:checkout: 47% drop" in md and "0.90" in md
+
+
+async def test_replay_warm_fast_forwards_healthy_segment_to_now(tmp_path):
+    import time
+
+    from rootcause.replay.player import Player
+
+    events = [{"type": "marker", "ts": 0, "data": {"name": "start"}}]
+    events += [{"type": "prom", "ts": 1_000 * i, "data": []} for i in range(0, 61)]  # 60 s healthy
+    events += [{"type": "marker", "ts": 61_000, "data": {"name": "break"}}]
+    path = tmp_path / "s.jsonl.gz"
+    with gzip.open(path, "wt") as fh:
+        fh.writelines(json.dumps(e) + "\n" for e in events)
+    fed, ticks = [], []
+
+    async def feed(ev, offset):
+        fed.append(int(ev["ts"]) + offset)
+
+    async def tick(t):
+        ticks.append(t)
+
+    p = Player(path, feed)
+    t0 = time.time() * 1000
+    await p.warm(tick, 5_000)
+    assert time.time() * 1000 - t0 < 2_000            # seconds, not a minute
+    assert abs(fed[-1] - t0) < 2_000                   # the healthy segment ends "now"
+    assert len(ticks) == 13 and ticks == sorted(ticks)  # one virtual tick per 5 s of recorded time

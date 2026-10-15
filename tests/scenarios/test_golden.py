@@ -38,13 +38,13 @@ async def test_top1_matches_truth(falkor_addr, scenario):
         s = S.model_copy(update={"rc_mode": "replay", "rc_agent_mode": "autopilot"})
         rt = Runtime(s, db, inline_agent=True)
 
-        async def verdict_ready() -> bool:
-            return any(i.get("agent_state") != "pending" for i in await db.run("open_incidents"))
-
-        await play_fast(path, rt.pipeline.feed, rt.tick, int(s.rc_tick_seconds * 1000), until=verdict_ready)
+        # play the healthy and the whole broken segment, then judge the diagnosis the engine ends up with
+        # (the agent re-investigates while signals evolve, so the final answer is what an on-call human acts on)
+        await play_fast(path, rt.pipeline.feed, rt.tick, int(s.rc_tick_seconds * 1000))
         rows = await db.run("open_incidents")
         assert rows, f"{scenario}: no incident opened"
-        hyps = (await db.run("get_incident", id=rows[0]["id"]))[0]["hyps"]
+        main = max(rows, key=lambda r: (len(r.get("members") or []), r.get("confidence") or 0))
+        hyps = (await db.run("get_incident", id=main["id"]))[0]["hyps"]
         top = sorted([h for h in hyps if h.get("target")], key=lambda h: h["rank"])[0]["target"]
         assert top == TRUTH[flag], f"{scenario}: top-1 {top}, truth {TRUTH[flag]}"
     finally:
