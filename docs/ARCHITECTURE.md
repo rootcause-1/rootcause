@@ -75,11 +75,11 @@ histories for slopes, SSE queues, and the replay player's cursor.
    resolving it (2 min of silence does count as healthy). Latency needs ≥ 5 samples, Kafka lag ≥ 3 messages.
 4. **Connections**: if ≥ 50 % of an edge's failing calls were never answered by any server span, the connection is
    the cause (`edge:A->B`) — no need to wait for the callee's traffic to vanish from the window.
-6. **Noise vs. signal**: baselines learn fast for 3 minutes (α 0.1) and then slowly (α 0.01) so a leak is not absorbed
+5. **Noise vs. signal**: baselines learn fast for 3 minutes (α 0.1) and then slowly (α 0.01) so a leak is not absorbed
    as normal; an error alert needs ≥ 2 failed requests, a latency alert a p95 ≥ 100 ms that beats 2× baseline and
    baseline + 3σ, and the service-wide p95 needs ≥ 10 requests (routes need 5); memory slope over 2 min must hold 60 s;
    CONSUMER spans are inbound work; JVM time-in-GC is its own rule.
-5. **Changes**: only *live* changes count as causes — not superseded by a later change to the same flag, not a return
+6. **Changes**: only *live* changes count as causes — not superseded by a later change to the same flag, not a return
    to the variant the flag had while baselines were learned, not made by RootCause itself. The diagnosis is frozen
    while an approved fix is being verified, and the report renders the agent's verdict snapshot.
 
