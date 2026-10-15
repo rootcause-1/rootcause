@@ -132,3 +132,14 @@ def test_parse_body_gzip_json():
     assert parse_body(raw, "application/json", "gzip") == doc
     assert parse_body(raw, "application/json") == doc  # magic-byte sniffing
     assert parse_body(json.dumps(doc).encode(), "application/json") == doc
+
+
+def test_report_uses_verdict_snapshot_over_recovered_graph():
+    from rootcause.actions.report import render
+
+    inc = {"id": "INC-1", "root_target": "payment", "status": "resolved", "alerts": [], "hypotheses": [],
+           "changes": [], "impact": [], "steps": [], "actions": [], "confidence": 0.4}
+    verdict = {"root_cause": "payment", "confidence": 0.9, "evidence_path": ["checkout", "payment"],
+               "impact": [{"journey": "journey:checkout", "pct": 0.47, "impacted": True}]}
+    md = render(inc, ["payment"], [], None, verdict)
+    assert "`checkout` → `payment`" in md and "journey:checkout: 47% drop" in md and "0.90" in md

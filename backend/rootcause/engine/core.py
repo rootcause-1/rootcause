@@ -48,7 +48,12 @@ class IncidentEngine:
                 created, onset_ts = True, onset
             else:
                 created = False
-                onset_ts = next(i["onset_ts"] for i in open_incs if i["id"] == inc_id)
+                inc = next(i for i in open_incs if i["id"] == inc_id)
+                onset_ts = inc["onset_ts"]
+                if inc.get("agent_state") == "verifying":
+                    # a fix is executing: keep the diagnosis as it was when the human approved it
+                    await db.run("update_incident_members", id=inc_id, members=members, quiet=0, now=now_ms)
+                    continue
             await db.run("update_incident_members", id=inc_id, members=members, quiet=0, now=now_ms)
             summary = await self.analyze(inc_id, members, int(onset_ts), alerts, now_ms)
             summary["created"] = created
