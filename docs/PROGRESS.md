@@ -142,3 +142,36 @@ approving ACT-0c13fb6a (flag_revert paymentFailure, risk low)
   `claude_desktop_config.json`) and LLM agent mode (`RC_AGENT_MODE=llm` needs `ANTHROPIC_API_KEY`).
 - Detector fix found via the UI: checkout/payment get ~2 requests/min, so some 60 s windows have no payment spans;
   those were treated as healthy and resolved the alert. Now a too-quiet window is `no_data` and holds state.
+
+## Break every catalogue flag once (CLAUDE.md §12 note) — 15/16 Oct 2026
+
+`scripts/acceptance_check.py --flag <f>` per flag (flip as a human would, watch ≤ 210 s, let the verdict settle 45 s,
+revert). Pass 1 ran on the engine as of the M7 check; every miss was fixed **generally** (no flag-specific code), then
+re-run (pass 2). Details per flag are in the comments of `backend/rootcause/chaos/catalogue.yaml`.
+
+| Flag | Class | Pass 1 top-1 | Fix (general) | Pass 2 top-1 |
+|---|---|---|---|---|
+| paymentFailure | errors | ✅ payment (t=41 s) | – | – |
+| paymentUnreachable | errors | ✅ edge:checkout->payment (34 s) | – | – |
+| cartFailure | errors | ✅ cart (35 s) | – | – |
+| adFailure | errors | ✅ ad (63 s) | – | – |
+| productCatalogFailure | errors | ❌ no alerts | the flag has a targeting rule: switch/watch flags through `targeting.if[1]` like the demo's flag UI (the fault was never injected) | ✅ product-catalog (55 s) |
+| productCatalogLockContention | latency | ❌ db:astronomy-db #1, truth #2 | proposals now include reverting live changes on other top-3 suspects | ❌ db:astronomy-db 0.76, truth #2 at 0.73 — **known miss**; first proposal is the right flag revert |
+| imageSlowLoad | latency | ❌ frontend (a Node heap sawtooth raised a memory alert) | memory slope must also exceed baseline + 3× its deviation | ✅ frontend-proxy (48 s) |
+| intlShippingSlowdown | latency | ❌ checkout (shipping never alerted) | slowest-route p95 per service (only non-US `/ship-order` is slow) | ✅ shipping (153 s) |
+| adHighCpu | invisible | ✅ ad (30 s, cpu) | – | – |
+| adManualGc | latency | ✅ ad (45 s) | + JVM GC-pressure rule (time in GC from Prometheus) | ✅ ad (43 s) |
+| emailMemoryLeak | invisible | ❌ 100x: no alert in 7 min (~2.4 MB/min) | catalogue variant 1000x (the demo's own; 100x is below any sane threshold) | ✅ email (56 s) |
+| recommendationCacheFailure | invisible | ✅ recommendation (132 s) | – | – |
+| kafkaQueueProblems | invisible | ❌ db:astronomy-db | CONSUMER spans count as inbound work (a throttled consumer is a slow service); truth is fraud-detection **or** checkout (both effects are in the demo source) | ✅ fraud-detection (39 s) |
+| kafkaConsumerDead | invisible | ✅ fraud-detection (77 s, vanished consumer) | – | – |
+| aiRunawayAgent | ai | ✅ agent (36 s, agent_loop) | – | – |
+| aiSlowResponse | ai | ✅ agent (56 s, llm_latency) | – | – |
+
+Pass 1: 10/16 top-1. After the general fixes: 15/16 top-1, 16/16 top-3 (lock contention ranks the DB first).
+These are hand checks, not the scorecard; the blind numbers come from `make chaos` (docs/SCORECARD.md).
+
+Other things the sweep exposed and fixed: noise from tiny samples (latency p95 needs ≥ 10 requests, Kafka lag must
+grow ≥ 3 messages for 30 s, CPU must hold 30 s, latency must also exceed baseline + 3× deviation), the demo's default
+5 load-generator users being too few (LOCUST_USERS=12), and the Mac sleeping mid-run (pauses the Docker VM; runs
+during sleep were discarded and repeated).
