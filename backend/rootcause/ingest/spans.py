@@ -312,6 +312,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
             "src": a, "dst": b, "protocol": call_proto.get((a, b), "unknown"), "rps": n / secs,
             "err_rate": call_err[(a, b)] / n, "p95_ms": p95(call_lat[(a, b)]),
             "unanswered_rate": call_unans[(a, b)] / secs,
+            "unanswered_share": call_unans[(a, b)] / n,  # share of calls no server span answered
         })
     queues: dict[str, dict[str, float]] = defaultdict(lambda: {"produce_rate": 0.0, "consume_rate": 0.0})
     for (svc, q), n in sorted(prod.items()):

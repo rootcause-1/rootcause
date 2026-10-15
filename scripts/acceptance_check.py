@@ -35,6 +35,7 @@ def main() -> None:
     ap.add_argument("--variant")
     ap.add_argument("--wait", type=int, default=150, help="seconds to watch after the flip")
     ap.add_argument("--approve", action="store_true", help="approve the top proposal and wait for resolution")
+    ap.add_argument("--settle", type=int, default=60, help="seconds to keep watching after the first verdict")
     ap.add_argument("--flagd", default=str(FLAGD))
     ap.add_argument("--graph", default="rc_live")
     args = ap.parse_args()
@@ -50,6 +51,7 @@ def main() -> None:
     seen_alerts: set[str] = set()
     change_seen = False
     inc_id = None
+    verdict_at = None
     deadline = time.time() + args.wait
     while time.time() < deadline:
         if not change_seen:
@@ -68,9 +70,10 @@ def main() -> None:
         if new and inc_id is None:
             inc_id = new[0][0]
             print(f"t={(time.time() * 1000 - t0) / 1000:.1f}s  incident {inc_id} opened")
-        if inc_id and any(r[0] == inc_id and r[1] in ("awaiting_approval", "done") for r in new) \
-                and time.time() > deadline - args.wait / 2:
-            break
+        if inc_id and any(r[0] == inc_id and r[1] in ("awaiting_approval", "done") for r in new):
+            verdict_at = verdict_at or time.time()
+            if time.time() - verdict_at >= args.settle:  # a human reads the verdict before approving
+                break
         time.sleep(2)
 
     open_ids = [r[0] for r in rows(g, "MATCH (i:Incident) WHERE i.status='open' RETURN i.id") if r[0] not in before]

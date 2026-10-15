@@ -6,7 +6,7 @@ SET s.rps = 0.0, s.server_spans = 0, s.err_rate = 0.0, s.self_err_rate = 0.0, s.
 ;
 MATCH ()-[c:CALLS]->()
 WHERE c.last_seen < $cutoff AND c.rps > 0
-SET c.rps = 0.0, c.err_rate = 0.0, c.unanswered_rate = 0.0
+SET c.rps = 0.0, c.err_rate = 0.0, c.unanswered_rate = 0.0, c.unanswered_share = 0.0
 ;
 MATCH ()-[c:CALLED_BY]->()
 WHERE c.last_seen < $cutoff AND c.rps > 0

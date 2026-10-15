@@ -168,3 +168,16 @@ async def test_flag_affects_from_spans(db):
     await db.run("upsert_flag_affects", rows=[{"flag": "newFlag", "svc": "cart"}], now=NOW)
     rows = await db.run("flag_affects", flag="newFlag")
     assert rows[0]["services"] == ["cart"]
+
+
+async def test_edge_candidate_from_unanswered_calls(db):
+    # callee still shows traffic in the window, but most of the caller's failing calls got no server span
+    await db.run("upsert_services", rows=[{"id": s, "rps": 1.0, "err_rate": 0.0, "self_err_rate": 0.0,
+                                           "p95_ms": 1.0, "server_spans": 60} for s in ("checkout", "payment")],
+                 now=NOW)
+    await db.run("set_node_props", rows=[{"id": "payment", "props": {"bl_rps": 1.0}}])
+    await db.run("upsert_calls", rows=[{"src": "checkout", "dst": "payment", "protocol": "grpc", "rps": 1.0,
+                                        "err_rate": 1.0, "p95_ms": 5.0, "unanswered_rate": 0.5,
+                                        "unanswered_share": 0.6}], now=NOW)
+    rows = await db.run("edge_candidates", members=["checkout"])
+    assert [(r["caller"], r["callee"]) for r in rows] == [("checkout", "payment")]
