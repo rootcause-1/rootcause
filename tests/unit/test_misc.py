@@ -198,3 +198,17 @@ def test_compact_otlp_keeps_every_attribute_the_ingest_reads():
     cfg = IngestConfig(finalise_lag_ms=0, peer_aliases={"oteldemo.PaymentService": "payment"})
     agg = lambda d: aggregate_traces({"t": parse_otlp_json(d)}, 0, 10**12, cfg)  # noqa: E731
     assert agg(small).calls == agg(doc).calls and agg(small).flag_affects == agg(doc).flag_affects
+
+
+def test_targeting_flag_is_switched_through_its_on_branch():
+    from rootcause.ingest.flag_watcher import default_variants
+
+    cfg = {"flags": {
+        "productCatalogFailure": {"defaultVariant": "off", "variants": {"on": True, "off": False},
+                                  "targeting": {"if": [{"==": [{"var": "product_id"}, "X"]}, "off", "off"]}},
+        "paymentFailure": {"defaultVariant": "off", "variants": {"100%": 1, "off": 0}}}}
+    on = with_variant(cfg, "productCatalogFailure", "on")
+    assert on["flags"]["productCatalogFailure"]["targeting"]["if"][1:] == ["on", "off"]
+    assert on["flags"]["productCatalogFailure"]["defaultVariant"] == "off"
+    assert default_variants(on) == {"productCatalogFailure": "on", "paymentFailure": "off"}
+    assert default_variants(with_variant(cfg, "paymentFailure", "100%"))["paymentFailure"] == "100%"

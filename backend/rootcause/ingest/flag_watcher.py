@@ -32,8 +32,18 @@ def actor_for(flag: str, variant: str) -> str:
     return "rootcause" if deadline and deadline >= time.time() else "unknown"
 
 
+def effective_variant(spec: dict[str, Any]) -> str:
+    """The variant a flag is switched to, as the demo's flag UI sets it: a flag with a targeting rule of the form
+    `if: [condition, <on-branch>, <else>]` (e.g. productCatalogFailure for one product id) is switched through the
+    on-branch; every other flag through `defaultVariant`."""
+    branches = (spec.get("targeting") or {}).get("if")
+    if isinstance(branches, list) and len(branches) == 3 and isinstance(branches[1], str):
+        return branches[1]
+    return str(spec.get("defaultVariant"))
+
+
 def default_variants(config: dict[str, Any]) -> dict[str, str]:
-    return {name: str(spec.get("defaultVariant")) for name, spec in (config.get("flags") or {}).items()}
+    return {name: effective_variant(spec) for name, spec in (config.get("flags") or {}).items()}
 
 
 def diff_flags(old: dict[str, str] | None, new: dict[str, str]) -> list[tuple[str, str | None, str]]:
