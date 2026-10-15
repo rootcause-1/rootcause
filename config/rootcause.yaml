@@ -57,13 +57,14 @@ detect:
   learn_seconds: 180
   ewma_alpha: 0.1
   hold_ticks: 2                              # a rule must hold this many consecutive ticks
-  hold_ticks_by_kind: {memory: 24}           # memory slope must hold 2 min (24 x 5 s ticks), CLAUDE.md §7.4
+  hold_ticks_by_kind: {memory: 24, lag: 6}   # memory slope must hold 2 min, lag growth 30 s (CLAUDE.md §7.4), at 5 s ticks
   resolve_ticks: 3                           # healthy ticks before an alert resolves
   no_data_resolve_ticks: 24                  # a window too quiet to judge holds alert state; 2 min of silence counts as healthy
   min_rps: 0.02                              # ignore error/latency rules on nodes with less traffic (real demo: checkout/payment run at ~0.03 rps)
   error_sigma: 3.0
   error_floor: 0.05
   latency_factor: 2.0
+  latency_sigma: 3.0                         # and above baseline + 3 x its mean deviation
   latency_min_ms: 50
   lag_consume_ratio: 0.2
   lag_min_messages: 3                        # a lag of 1-2 orders is one message in flight, not a backlog

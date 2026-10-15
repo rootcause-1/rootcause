@@ -74,7 +74,8 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
         if busy and not enough:
             out["latency"] = NO_DATA
         if lat is not None and bl and busy and enough:
-            thr = max(c["latency_factor"] * bl, c["latency_min_ms"])
+            # 2x baseline, but also outside the service's normal spread (agent/LLM latencies are naturally spiky)
+            thr = max(c["latency_factor"] * bl, bl + c.get("latency_sigma", 0.0) * (dev or 0.0), c["latency_min_ms"])
             if lat > thr:
                 out["latency"] = Breach("latency", lat, thr, bl, dev)
 

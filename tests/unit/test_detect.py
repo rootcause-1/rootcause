@@ -129,3 +129,10 @@ async def test_quiet_window_holds_a_firing_alert():
     assert out["resolved"] == [] and "resolve_alert" not in calls
     out = await Detector(FakeDB({**quiet, "nd_error_rate": 23}), cfg, set()).run(1_000_000, incidents_open=True)
     assert [a["id"] for a in out["resolved"]] == ["ALT-1"]  # 2 min of silence counts as healthy
+
+
+def test_latency_threshold_respects_normal_spread():
+    c = {**C, "latency_sigma": 3.0}
+    spiky = {"rps": 0.2, "p95_ms": 153.0, "bl_p95_ms": 78.0, "bl_p95_ms_dev": 30.0, "server_spans": 11}
+    assert evaluate("Service", spiky, c)["latency"] is None       # 153 < 78 + 3*30
+    assert evaluate("Service", {**spiky, "p95_ms": 5000.0}, c)["latency"] is not None
