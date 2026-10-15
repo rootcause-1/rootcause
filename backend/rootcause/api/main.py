@@ -91,7 +91,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 async def otlp_traces(request: Request) -> JSONResponse:
     body = await request.body()
     try:
-        doc = parse_body(body, request.headers.get("content-type", ""))
+        doc = parse_body(body, request.headers.get("content-type", ""), request.headers.get("content-encoding", ""))
     except Exception as exc:
         raise HTTPException(400, f"bad OTLP body: {exc}") from exc
     await S.rt.pipeline.feed({"type": "otlp", "ts": now_ms(), "data": doc})

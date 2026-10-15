@@ -119,3 +119,16 @@ def test_replay_segments(tmp_path: Path):
     seg = segments(evs)
     assert [len(seg[k]) for k in ("healthy", "broken", "recovery")] == [1, 1, 1]
     assert seg["fix"] == {"kind": "flag_revert", "target": "paymentFailure"}
+
+
+def test_parse_body_gzip_json():
+    import gzip
+    import json
+
+    from rootcause.ingest.otlp import parse_body
+
+    doc = {"resourceSpans": []}
+    raw = gzip.compress(json.dumps(doc).encode())
+    assert parse_body(raw, "application/json", "gzip") == doc
+    assert parse_body(raw, "application/json") == doc  # magic-byte sniffing
+    assert parse_body(json.dumps(doc).encode(), "application/json") == doc

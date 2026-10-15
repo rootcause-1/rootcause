@@ -2,7 +2,7 @@
 
 Pure logic (no graph access). `SpanWindow` is the short-lived in-process buffer for the 60 s window; every tick
 `aggregate(now_ms)` turns it into row lists for these queries: upsert_services, upsert_calls, upsert_messaging,
-upsert_uses, upsert_journeys and set_node_props (agent metrics). The graph stays the source of truth.
+upsert_uses, upsert_journeys, set_node_props (agent metrics) and upsert_flag_affects (services that evaluate a flag). The graph stays the source of truth.
 
 Rules (CLAUDE.md §7.1):
 - CLIENT span in A whose child SERVER span is in B -> call A->B. No child server span -> name B from
@@ -54,16 +54,17 @@ class WindowStats:
     journeys: list[dict[str, Any]] = field(default_factory=list)
     requires: list[dict[str, Any]] = field(default_factory=list)
     agent_props: list[dict[str, Any]] = field(default_factory=list)
+    flag_affects: list[dict[str, Any]] = field(default_factory=list)  # [{flag, svc}] from flag evaluation events
     span_count: int = 0
 
 
 def _protocol(span: Span) -> str:
     a = span.attrs
-    if a.get("rpc.system"):
-        return str(a["rpc.system"])
+    if a.get("rpc.system") or a.get("rpc.system.name"):
+        return str(a.get("rpc.system") or a.get("rpc.system.name"))
     if a.get("messaging.system"):
         return str(a["messaging.system"])
-    if any(k in a for k in ("http.request.method", "http.method", "url.full", "http.url")):
+    if any(k in a for k in ("http.request.method", "http.method", "url.full", "http.url", "http.protocol")):
         return "http"
     return "unknown"
 
@@ -118,10 +119,11 @@ def _peer_name(span: Span, aliases: dict[str, str], known: set[str]) -> str | No
     a = span.attrs
     if a.get("peer.service"):
         return aliases.get(str(a["peer.service"]), str(a["peer.service"]))
-    if a.get("rpc.service"):
-        rs = str(a["rpc.service"])
-        if rs in aliases:
-            return aliases[rs]
+    # rpc.service (old semconv) or the service part of rpc.method ("oteldemo.PaymentService/Charge", new semconv);
+    # this names the callee even when the client dialled an unknown host (e.g. checkout -> "badAddress")
+    rs = a.get("rpc.service") or (str(a["rpc.method"]).rsplit("/", 1)[0] if "/" in str(a.get("rpc.method", "")) else None)
+    if rs and str(rs) in aliases:
+        return aliases[str(rs)]
     for key in ("server.address", "net.peer.name"):
         host = a.get(key)
         if host:
@@ -165,6 +167,8 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
     agent_runs: dict[str, list[tuple[int, int]]] = defaultdict(list)  # service -> [(tool_calls, llm_calls)]
     agent_llm_lat: dict[str, list[float]] = defaultdict(list)
 
+    flag_evals: set[tuple[str, str]] = set()
+
     count = 0
     for spans in traces.values():
         by_id = {s.span_id: s for s in spans}
@@ -178,6 +182,9 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
         for s in in_window:
             svc_any.add(s.service)
             kids = children.get(s.span_id, [])
+            for key in s.flag_keys:
+                if s.service not in cfg.non_candidates:
+                    flag_evals.add((key, s.service))
 
             if s.kind == SERVER:
                 svc_server[s.service] += 1
@@ -224,23 +231,25 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
                 q = _queue_id(s)
                 if q:
                     cons[(q, s.service)] += 1
-                    group = s.attrs.get("messaging.consumer.group.name") or s.attrs.get("messaging.kafka.consumer.group")
+                    group = (s.attrs.get("messaging.consumer.group.name") or s.attrs.get("messaging.kafka.consumer.group")
+                             or s.attrs.get("messaging.kafka.consumer_group"))
                     if group:
                         cons_group[(q, s.service)] = str(group)
 
-            if s.name == cfg.agent_workflow_span:
+            if s.name == cfg.agent_workflow_span or s.name.startswith(cfg.agent_workflow_span + "."):
                 tools, llms = _agent_children(s, children)
                 agent_runs[s.service].append((len(tools), len(llms)))
                 agent_llm_lat[s.service].extend(x.duration_ms for x in llms)
 
-        # journeys: root spans at the frontend / proxy
+        # journeys: entry spans at the frontend / proxy. An entry span has no parent, or its parent belongs to a
+        # service outside the shop (the load generator or the browser, which are traced too).
         for s in in_window:
-            if s.parent_id and s.parent_id in by_id:
-                continue
-            if s.parent_id:  # parent exists but is outside this trace buffer: not a root
-                continue
             if s.service not in cfg.journey_root_services:
                 continue
+            if s.parent_id:
+                parent = by_id.get(s.parent_id)
+                if parent is None or parent.service in cfg.journey_root_services:
+                    continue
             journey = match_journey(_route(s), cfg.journeys)
             if not journey:
                 continue
@@ -251,6 +260,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
                 j_touch[journey][svc] += 1
 
     st = WindowStats(span_count=count)
+    st.flag_affects = [{"flag": f, "svc": svc} for f, svc in sorted(flag_evals)]
     for svc in sorted(svc_any):
         n = svc_server[svc]
         st.services.append({
@@ -312,7 +322,8 @@ def _datastore_id(span: Span, system: str, cfg: IngestConfig) -> str:
     if system.lower() in cfg.cache_systems:
         host = a.get("server.address") or a.get("net.peer.name") or system
         return f"cache:{host}"
-    name = a.get("db.name") or a.get("db.namespace") or system
+    # the server host names the store consistently across clients (db.name / db.namespace differ per client)
+    name = a.get("server.address") or a.get("net.peer.name") or a.get("db.name") or a.get("db.namespace") or system
     return f"db:{name}"
 
 

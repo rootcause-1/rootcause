@@ -131,3 +131,44 @@ def test_parse_otlp_json_with_string_enums_and_offset():
     assert s.service == "cart" and s.kind == SERVER and s.error
     assert s.duration_ms == 50 and s.start_ms == 1_700_000_000_000 + 5
     assert s.attrs["n"] == 3
+
+
+def test_unanswered_call_named_via_rpc_method_new_semconv():
+    # real demo (Oct 2026): checkout's gRPC client spans carry rpc.method + rpc.system.name, no rpc.service
+    st = run([
+        sp("t", "1", "", "checkout", SERVER, err=True),
+        sp("t", "2", "1", "checkout", CLIENT, err=True, **{"rpc.method": "oteldemo.PaymentService/Charge",
+                                                              "rpc.system.name": "grpc",
+                                                              "server.address": "badAddress"}),
+    ])
+    calls = {(c["src"], c["dst"]): c for c in st.calls}
+    assert calls[("checkout", "payment")]["protocol"] == "grpc"
+    assert calls[("checkout", "payment")]["unanswered_rate"] > 0
+
+
+def test_journey_entry_span_under_load_generator_parent():
+    cfg = IngestConfig(window_ms=60_000, finalise_lag_ms=0, journeys=CFG.journeys,
+                       non_candidates=frozenset({"load-generator"}))
+    st = run([
+        sp("t", "0", "", "load-generator", CLIENT),
+        sp("t", "1", "0", "frontend-proxy", SERVER, **{"http.url": "http://frontend-proxy:8080/api/checkout"}),
+        sp("t", "2", "1", "frontend-proxy", CLIENT),
+        sp("t", "3", "2", "frontend", SERVER, **{"http.route": "/api/checkout"}),
+    ], cfg)
+    j = {x["id"]: x for x in st.journeys}
+    assert j["journey:checkout"]["rps"] > 0  # counted once, at the proxy
+    assert abs(j["journey:checkout"]["rps"] - 1 / 60) < 1e-9
+    assert all(r["svc"] != "load-generator" for r in st.requires)
+
+
+def test_flag_evaluation_events_become_affects_rows():
+    doc = {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "cart"}}]},
+                              "scopeSpans": [{"spans": [{
+                                  "traceId": "t", "spanId": "1", "name": "op", "kind": 2,
+                                  "startTimeUnixNano": "1000000000", "endTimeUnixNano": "1001000000",
+                                  "events": [{"name": "feature_flag.evaluation", "attributes": [
+                                      {"key": "feature_flag.key", "value": {"stringValue": "cartFailure"}}]}]}]}]}]}
+    spans = parse_otlp_json(doc)
+    assert spans[0].flag_keys == ("cartFailure",)
+    st = run(spans)
+    assert st.flag_affects == [{"flag": "cartFailure", "svc": "cart"}]

@@ -1,21 +1,21 @@
 # Chaos catalogue: flag -> ground truth. Used ONLY by the chaos harness for scoring, never by the engine.
-# VERIFY every `variant` against the flagd JSON and every `truth` by breaking the flag once by hand (CLAUDE.md §12),
+# Variants verified against demo src/flagd/demo.flagd.json (demo commit df9f4d0, 15 Oct 2026). VERIFY every and every `truth` by breaking the flag once by hand (CLAUDE.md §12),
 # then write what you observed (which alerts, which nodes) in the comments. A human confirms each entry.
 # `off` is the variant the harness restores between runs (VERIFY it exists for every flag).
 
 - {flag: paymentFailure, variant: "100%", off: "off", truth: payment, class: errors}
 - {flag: paymentUnreachable, variant: "on", off: "off", truth: "edge:checkout->payment", class: errors}
-- {flag: cartFailure, variant: "on", off: "off", truth: cart, class: errors}
+- {flag: cartFailure, variant: "100%", off: "off", truth: cart, class: errors}
 - {flag: adFailure, variant: "on", off: "off", truth: ad, class: errors}
 - {flag: productCatalogFailure, variant: "on", off: "off", truth: product-catalog, class: errors}
-- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}   # flag name confirmed in OTel docs; VERIFY variant
+- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}
 - {flag: imageSlowLoad, variant: "5sec", off: "off", truth: image-provider, class: latency}   # VERIFY truth: docs say the delay is injected by Envoy (frontend-proxy) fault injection on image requests, so the engine may (correctly) point at frontend-proxy or the edge frontend-proxy->image-provider
-- {flag: intlShippingSlowdown, variant: "on", off: "off", truth: shipping, class: latency}   # flag name confirmed in OTel docs; VERIFY variant
+- {flag: intlShippingSlowdown, variant: "5sec", off: "off", truth: shipping, class: latency}
 - {flag: adHighCpu, variant: "on", off: "off", truth: ad, class: invisible}
 - {flag: adManualGc, variant: "on", off: "off", truth: ad, class: latency}
 - {flag: emailMemoryLeak, variant: "100x", off: "off", truth: email, class: invisible}
 - {flag: recommendationCacheFailure, variant: "on", off: "off", truth: recommendation, class: invisible}
-- {flag: kafkaQueueProblems, variant: "on", off: "off", truth: fraud-detection, class: invisible}   # docs: "slows the fraud consumer by a per-record delay"; BLAMES makes a lagging queue blame its consumer. VERIFY variant (may be a number)
+- {flag: kafkaQueueProblems, variant: "3sec", off: "off", truth: fraud-detection, class: invisible}   # docs: "slows the fraud consumer by a per-record delay"; BLAMES makes a lagging queue blame its consumer.
 - {flag: kafkaConsumerDead, variant: "on", off: "off", truth: fraud-detection, class: invisible}   # docs: "removes fraud detection from the orders consumer group"
 - {flag: aiRunawayAgent, variant: "on", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True
-- {flag: aiSlowResponse, variant: "on", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True
+- {flag: aiSlowResponse, variant: "5sec", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True

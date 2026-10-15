@@ -6,6 +6,7 @@ to the pipeline, which buffers them in the 60 s span window (ingest/spans.py).
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -30,6 +31,7 @@ class Span:
     end_ms: int
     error: bool
     attrs: dict[str, Any] = field(default_factory=dict)
+    flag_keys: tuple[str, ...] = ()  # feature flags evaluated in this span (feature_flag.evaluation events)
 
     @property
     def duration_ms(self) -> float:
@@ -69,6 +71,16 @@ def _status_error(status: dict[str, Any] | None) -> bool:
     return code == STATUS_ERROR or code == "STATUS_CODE_ERROR"
 
 
+def _flag_keys(sp: dict[str, Any]) -> tuple[str, ...]:
+    """OpenFeature's OTel hook records each evaluation as a span event carrying `feature_flag.key`."""
+    keys = []
+    for ev in sp.get("events") or []:
+        for kv in ev.get("attributes") or []:
+            if kv.get("key") == "feature_flag.key":
+                keys.append(str(_any_value(kv.get("value", {}))))
+    return tuple(keys)
+
+
 def parse_otlp_json(doc: dict[str, Any], offset_ms: int = 0) -> list[Span]:
     """Parse an ExportTraceServiceRequest in OTLP JSON. `offset_ms` time-shifts spans (replay)."""
     out: list[Span] = []
@@ -88,6 +100,7 @@ def parse_otlp_json(doc: dict[str, Any], offset_ms: int = 0) -> list[Span]:
                     end_ms=int(sp.get("endTimeUnixNano", 0)) // 1_000_000 + offset_ms,
                     error=_status_error(sp.get("status")),
                     attrs=_attrs(sp.get("attributes")),
+                    flag_keys=_flag_keys(sp),
                 ))
     return out
 
@@ -105,8 +118,11 @@ def protobuf_to_json(body: bytes) -> dict[str, Any]:
     return MessageToDict(req)
 
 
-def parse_body(body: bytes, content_type: str) -> dict[str, Any]:
-    """Return the OTLP JSON document for a request body (JSON or protobuf)."""
+def parse_body(body: bytes, content_type: str, content_encoding: str = "") -> dict[str, Any]:
+    """Return the OTLP JSON document for a request body (JSON or protobuf, optionally gzip-compressed:
+    the collector's otlp_http exporter gzips by default)."""
+    if "gzip" in (content_encoding or "") or body[:2] == b"\x1f\x8b":
+        body = gzip.decompress(body)
     if "protobuf" in (content_type or ""):
         return protobuf_to_json(body)
     return json.loads(body or b"{}")

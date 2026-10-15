@@ -43,6 +43,7 @@ ROWS = {
     "upsert_uses": [{"svc": "x", "ds": "db:x", "system": "postgresql", "rps": 1.0, "err_rate": 0.0, "p95_ms": 1.0}],
     "upsert_containers": [{"container": "x-1", "service": "x", "cpu_pct": 1.0, "mem_mb": 10.0, "mem_slope": 0.0}],
     "set_node_props": [{"id": "payment", "props": {"note": 1}}],
+    "upsert_flag_affects": [{"flag": "paymentFailure", "svc": "payment"}],
     "set_call_baselines": [{"src": "checkout", "dst": "payment", "baseline_err": 0.0, "baseline_p95": 10.0}],
 }
 ID_OVERRIDES = {"create_flag_change": "CHG-x", "create_container_change": "CHG-y", "create_alert": "ALT-x",
@@ -161,3 +162,9 @@ async def test_no_anomalies_means_no_incidents(db):
     """Regression: on a fresh graph algo.WCC ignored the missing :Anomalous label and grouped seed nodes."""
     from rootcause.engine import grouping
     assert await grouping.components(db) == []
+
+
+async def test_flag_affects_from_spans(db):
+    await db.run("upsert_flag_affects", rows=[{"flag": "newFlag", "svc": "cart"}], now=NOW)
+    rows = await db.run("flag_affects", flag="newFlag")
+    assert rows[0]["services"] == ["cart"]

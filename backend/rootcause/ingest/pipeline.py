@@ -5,7 +5,7 @@ Inputs are events `{"type", "ts", "data"}` of type otlp | prom | docker_stats | 
 calls the very same `feed()` with a time offset, so replayed scenarios go through identical code.
 
 Queries used: upsert_services, upsert_calls, upsert_messaging, upsert_uses, upsert_journeys, set_node_props,
-upsert_containers, create_flag_change, create_container_change, decay_stale.
+upsert_flag_affects, upsert_containers, create_flag_change, create_container_change, decay_stale.
 """
 
 from __future__ import annotations
@@ -83,6 +83,8 @@ class Pipeline:
             await db.run("upsert_journeys", journeys=st.journeys, requires=st.requires, now=now_ms)
         if st.agent_props:
             await db.run("set_node_props", rows=st.agent_props)
+        if st.flag_affects:
+            await db.run("upsert_flag_affects", rows=st.flag_affects, now=now_ms)
         await db.run("decay_stale", cutoff=now_ms - self.cfg.window_ms)
         return st
 

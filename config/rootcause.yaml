@@ -4,20 +4,20 @@
 # and logs a warning instead of guessing.
 
 demo:
-  compose_project: opentelemetry-demo        # VERIFY: docker compose project / network name
-  network: opentelemetry-demo                # VERIFY
-  collector_exporter_type: otlp_http         # VERIFY: otlp_http vs otlphttp (check collector logs)
-  collector_json_encoding: null              # VERIFY: true once `encoding: json` is confirmed
-  agent_prompt_url: null                     # VERIFY: e.g. http://localhost:8080/<agent>/prompt (read compose.agent.yaml)
-  agent_service: agent                       # VERIFY: service.name of the agent's spans
-  agent_workflow_span: astronomy_shop_agent_workflow
+  compose_project: opentelemetry-demo        # verified 2026-10-15: compose project label + `docker network ls`
+  network: opentelemetry-demo                # verified
+  collector_exporter_type: otlp_http         # verified: collector-contrib 0.160.0 accepts otlp_http/<name>
+  collector_json_encoding: true              # verified: `encoding: json` accepted; bodies arrive gzip-compressed
+  agent_prompt_url: http://agent:8010/prompt # verified (compose.agent.yaml, AGENT_PORT=8010); body {message: ...}; the load generator already sends prompts (user_ask_agent)
+  agent_service: agent                       # verified: service.name of the agent's spans
+  agent_workflow_span: astronomy_shop_agent_workflow   # verified: real span name is astronomy_shop_agent_workflow.workflow (prefix match)
   flagd_hot_reload: null                     # VERIFY: true once a hand edit changes the shop
-  flag_eval_attribute: null                  # VERIFY: e.g. feature_flag.key if flag evaluations appear on spans
+  flag_eval_attribute: feature_flag.key      # verified: `feature_flag.evaluation` span events carry feature_flag.key (cart, checkout, product-catalog, recommendation, agent)
 
 ingest:
   window_seconds: 60
   finalise_lag_ticks: 2                      # traces younger than this many ticks are not aggregated yet
-  journey_root_services: [frontend-proxy, frontend]
+  journey_root_services: [frontend-proxy, frontend, agent]   # agent: the load generator calls POST /prompt directly
   journey_critical_share: 0.9                # REQUIRES.critical when a service is in >= 90% of a journey's traces
   # map rpc.service / server.address values to service.name when no server span answers
   peer_aliases:
@@ -34,13 +34,15 @@ ingest:
   cache_systems: [redis, valkey]
 
 prometheus:
-  url: http://prometheus:9090                # VERIFY (overridden by PROMETHEUS_URL)
+  url: http://prometheus:9090                # verified: prometheus:9090 inside the demo network (overridden by PROMETHEUS_URL)
   # Filled by scripts/discover_metrics.py, then confirmed by a human. Each entry:
   #   promql: the query; label: which series label names the target; target_prefix: node id prefix;
   #   prop: the property written on the node.
   queries:
-    kafka_lag: null                          # VERIFY e.g. {promql: 'sum by (topic) (kafka_consumergroup_lag)', label: topic, target_prefix: 'queue:', prop: lag}
-    runtime_memory: null                     # VERIFY e.g. {promql: 'sum by (service_name) (process_memory_usage)', label: service_name, target_prefix: '', prop: runtime_mem_mb, scale: 1.0e-6}
+    # verified 2026-10-15 via scripts/discover_metrics.py (kafkametrics receiver; series per group+topic, e.g. orders)
+    kafka_lag: {promql: 'sum by (topic) (kafka_consumer_group_lag_sum_ratio)', label: topic, target_prefix: 'queue:', prop: lag}
+    # verified: JVM services only (ad, recommendation, fraud-detection, kafka); others are covered by docker stats
+    runtime_memory: {promql: 'sum by (service_name) (jvm_memory_used_bytes)', label: service_name, target_prefix: '', prop: runtime_mem_mb, scale: 1.0e-6}
 
 docker:
   enabled: true
@@ -56,7 +58,7 @@ detect:
   ewma_alpha: 0.1
   hold_ticks: 2                              # a rule must hold this many consecutive ticks
   resolve_ticks: 3                           # healthy ticks before an alert resolves
-  min_rps: 0.05                              # ignore error/latency rules on nodes with less traffic
+  min_rps: 0.02                              # ignore error/latency rules on nodes with less traffic (real demo: checkout/payment run at ~0.03 rps)
   error_sigma: 3.0
   error_floor: 0.05
   latency_factor: 2.0
@@ -93,4 +95,4 @@ verify:
   timeout_seconds: 90
 
 # never candidates for root cause, never alerted on
-non_candidates: [load-generator, flagd, flagd-ui, otel-collector, otelcol, rootcause-api, rootcause-mcp, rootcause-ui, jaeger, prometheus, grafana, opensearch]
+non_candidates: [load-generator, frontend-web, flagd, flagd-ui, otel-collector, otelcol, rootcause-api, rootcause-mcp, rootcause-ui, jaeger, prometheus, grafana, opensearch]
