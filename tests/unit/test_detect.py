@@ -3,7 +3,7 @@
 import pytest
 
 from rootcause.detect.baselines import ewma, update_baselines
-from rootcause.detect.rules import evaluate, step_counters
+from rootcause.detect.rules import NO_DATA, evaluate, step_counters
 
 C = {"min_rps": 0.05, "error_sigma": 3.0, "error_floor": 0.05, "latency_factor": 2.0, "latency_min_ms": 50,
      "lag_consume_ratio": 0.2, "mem_slope_mb_per_min": 5, "cpu_pct": 85, "agent_loop_factor": 3.0,
@@ -33,7 +33,7 @@ def test_error_rule_uses_sigma_when_noisy():
 
 
 def test_error_rule_ignores_idle_nodes_and_noise():
-    assert evaluate("Service", {"rps": 0.01, "err_rate": 1.0}, C)["error_rate"] is None
+    assert evaluate("Service", {"rps": 0.01, "err_rate": 1.0}, C)["error_rate"] == NO_DATA  # too quiet to judge
     assert evaluate("Service", {"rps": 5, "err_rate": 0.04, "bl_err_rate": 0.0}, C)["error_rate"] is None
 
 
@@ -85,7 +85,7 @@ def test_llm_latency_needs_absolute_floor():
 def test_latency_and_lag_need_enough_data():
     c = {**C, "latency_min_samples": 5, "lag_min_messages": 3}
     few = {"rps": 0.05, "p95_ms": 232.0, "bl_p95_ms": 69.0, "server_spans": 3}
-    assert evaluate("Service", few, c)["latency"] is None
+    assert evaluate("Service", few, c)["latency"] == NO_DATA
     assert evaluate("Service", {**few, "server_spans": 12}, c)["latency"] is not None
     q = {"produce_rate": 0.02, "consume_rate": 0.04, "lag": 1.0, "lag_slope": 2.0}
     assert evaluate("Queue", q, c)["lag"] is None
@@ -104,3 +104,28 @@ async def test_detector_reuses_graph_baselines_after_restart():
     d = Detector(FakeDB(), {**C, "learn_seconds": 180, "ewma_alpha": 0.1, "hold_ticks": 2, "resolve_ticks": 3}, set())
     out = await d.run(1_000_000, incidents_open=False)
     assert out["learning_left_ms"] == 0
+
+
+async def test_quiet_window_holds_a_firing_alert():
+    from rootcause.detect.rules import Detector
+
+    calls = []
+
+    class FakeDB:  # unit stand-in; real graph behaviour is covered in tests/graph
+        def __init__(self, props):
+            self.props = props
+
+        async def run(self, name, **kw):
+            calls.append(name)
+            if name == "read_detect_inputs":
+                return [{"id": "payment", "labels": ["Service", "Anomalous"], "props": self.props}]
+            if name == "open_alerts":
+                return [{"id": "ALT-1", "target": "payment", "kind": "error_rate"}]
+            return []
+
+    cfg = {**C, "learn_seconds": 0, "ewma_alpha": 0.1, "hold_ticks": 2, "resolve_ticks": 3, "no_data_resolve_ticks": 24}
+    quiet = {"rps": 0.0, "bl_rps": 0.05, "err_rate": 0.0, "ok_error_rate": 5}
+    out = await Detector(FakeDB(quiet), cfg, set()).run(1_000_000, incidents_open=True)
+    assert out["resolved"] == [] and "resolve_alert" not in calls
+    out = await Detector(FakeDB({**quiet, "nd_error_rate": 23}), cfg, set()).run(1_000_000, incidents_open=True)
+    assert [a["id"] for a in out["resolved"]] == ["ALT-1"]  # 2 min of silence counts as healthy

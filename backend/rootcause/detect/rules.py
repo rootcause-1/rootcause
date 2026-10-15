@@ -43,11 +43,18 @@ def _f(props: dict[str, Any], key: str, default: float | None = None) -> float |
     return default if v is None else float(v)
 
 
-def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Breach | None]:
-    """Evaluate every rule for one node. Returns {kind: Breach or None}. Pure; unit-tested."""
-    out: dict[str, Breach | None] = {k: None for k in RULE_KINDS.get(label, ())}
+NO_DATA = "no_data"  # too little traffic in the window to judge: neither a breach nor evidence of health
+
+
+def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Breach | str | None]:
+    """Evaluate every rule for one node. Returns {kind: Breach, None (healthy) or NO_DATA}. Pure; unit-tested."""
+    out: dict[str, Breach | str | None] = {k: None for k in RULE_KINDS.get(label, ())}
     rps = _f(p, "rps", 0.0) or 0.0
     busy = rps >= c["min_rps"]
+    if not busy:
+        for kind in ("error_rate", "latency"):
+            if kind in out:
+                out[kind] = NO_DATA
 
     if "error_rate" in out and busy:
         # service-wide error rate, then the worst single route (op_err_rate), each against its own baseline
@@ -64,6 +71,8 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
         lat, bl, dev = _f(p, "p95_ms"), _f(p, "bl_p95_ms"), _f(p, "bl_p95_ms_dev", 0.0)
         samples = _f(p, "server_spans")  # None for datastores (no per-window count): rule applies
         enough = samples is None or samples >= c.get("latency_min_samples", 0)
+        if busy and not enough:
+            out["latency"] = NO_DATA
         if lat is not None and bl and busy and enough:
             thr = max(c["latency_factor"] * bl, c["latency_min_ms"])
             if lat > thr:
@@ -139,11 +148,21 @@ class Detector:
             updates: dict[str, Any] = {}
             anomalous = "Anomalous" in n["labels"]
             if nid not in self.non_candidates and not learning:
-                for kind, breach in evaluate(label, props, self.c).items():
+                for kind, result in evaluate(label, props, self.c).items():
+                    alert = firing.get((nid, kind))
+                    if result == NO_DATA:
+                        # sparse traffic (e.g. checkout at ~2/min): hold state; only a long silence counts as health
+                        nd = int(props.get(f"nd_{kind}", 0)) + 1
+                        updates[f"nd_{kind}"] = nd
+                        if nd < int(self.c.get("no_data_resolve_ticks", 24)):
+                            continue
+                        result = None
+                    else:
+                        updates[f"nd_{kind}"] = 0
+                    breach = result if isinstance(result, Breach) else None
                     hit, ok = step_counters(breach is not None, int(props.get(f"hit_{kind}", 0)),
                                             int(props.get(f"ok_{kind}", 0)))
                     updates[f"hit_{kind}"], updates[f"ok_{kind}"] = hit, ok
-                    alert = firing.get((nid, kind))
                     hold = int((self.c.get("hold_ticks_by_kind") or {}).get(kind, self.c["hold_ticks"]))
                     if breach and not alert and hit >= hold:
                         aid = new_id("ALT")

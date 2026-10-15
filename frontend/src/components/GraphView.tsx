@@ -43,6 +43,7 @@ export default function GraphView({ graph, overlays }: { graph: Graph | null; ov
   useEffect(() => {
     if (!box.current) return;
     cy.current = cytoscape({ container: box.current, style, wheelSensitivity: 0.2 });
+    (window as unknown as { __cy?: Core }).__cy = cy.current; // debugging handle
     const t = setInterval(() => cy.current?.nodes(".anomalous").toggleClass("pulse"), 700);
     return () => { clearInterval(t); cy.current?.destroy(); };
   }, []);
