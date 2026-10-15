@@ -13,6 +13,15 @@ import Reports from "./tabs/Reports";
 const TABS = ["Incident", "Chaos lab", "Predict", "Memory", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
+// what a first-time visitor of the public replay site should know in each phase
+const REPLAY_HINT: Record<string, string> = {
+  warming: "fast-forwarding healthy traffic to learn baselines…",
+  healthy: "healthy traffic…",
+  broken: "a fault is live — watch the alerts become one incident, then approve the low-risk fix →",
+  recovery: "fix applied — watching recovery",
+  finished: "done — the scenario restarts in about 2 minutes",
+};
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("Incident");
   const [status, setStatus] = useState<Status | null>(null);
@@ -69,6 +78,11 @@ export default function App() {
         </span>
         <span className="font-mono text-xs text-slate-400">graph {status?.graph ?? "-"} · tick {status?.tick ?? 0} · {clock(status?.tick_ts)}</span>
         {status?.replay && <span className="text-xs text-violet-300">{status.replay.scenario}: {status.replay.phase}</span>}
+        {status?.replay && (
+          <span className="text-xs text-slate-300" title="Recorded from the real OpenTelemetry Demo; replayed through the same ingest and engine code.">
+            {REPLAY_HINT[status.replay.phase] ?? ""}
+          </span>
+        )}
         {status?.mode === "replay" && scenarios.length > 0 && (
           <select className="rounded border border-slate-700 bg-slate-950 p-1 text-xs" defaultValue=""
                   onChange={(e) => e.target.value && api.startReplay(e.target.value)}>
