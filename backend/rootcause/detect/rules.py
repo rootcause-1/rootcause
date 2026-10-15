@@ -62,7 +62,9 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
 
     if "latency" in out:
         lat, bl, dev = _f(p, "p95_ms"), _f(p, "bl_p95_ms"), _f(p, "bl_p95_ms_dev", 0.0)
-        if lat is not None and bl and busy:
+        samples = _f(p, "server_spans")  # None for datastores (no per-window count): rule applies
+        enough = samples is None or samples >= c.get("latency_min_samples", 0)
+        if lat is not None and bl and busy and enough:
             thr = max(c["latency_factor"] * bl, c["latency_min_ms"])
             if lat > thr:
                 out["latency"] = Breach("latency", lat, thr, bl, dev)
@@ -95,7 +97,7 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
         produce, consume = _f(p, "produce_rate", 0.0) or 0.0, _f(p, "consume_rate", 0.0) or 0.0
         lag, slope = _f(p, "lag"), _f(p, "lag_slope")
         starving = produce > 0 and consume < c["lag_consume_ratio"] * produce
-        growing = lag is not None and lag > 0 and slope is not None and slope > 0
+        growing = lag is not None and lag >= c.get("lag_min_messages", 1) and slope is not None and slope > 0
         if starving or growing:
             value = lag if growing and lag is not None else (consume / produce if produce else 0.0)
             out["lag"] = Breach("lag", value, c["lag_consume_ratio"], _f(p, "bl_consume_rate", 0.0) or 0.0, 0.0)

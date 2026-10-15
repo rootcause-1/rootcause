@@ -65,6 +65,8 @@ detect:
   latency_factor: 2.0
   latency_min_ms: 50
   lag_consume_ratio: 0.2
+  lag_min_messages: 3                        # a lag of 1-2 orders is one message in flight, not a backlog
+  latency_min_samples: 5                     # p95 of fewer server spans in the window is noise (checkout runs ~3/min)
   mem_slope_mb_per_min: 5
   cpu_pct: 85
   agent_loop_factor: 3.0

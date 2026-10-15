@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from rootcause.graph.client import GraphDB
+from rootcause.settings import get_settings
 from rootcause.util import new_id, now_ms
 
 
@@ -30,7 +31,7 @@ def broken_journeys(failing: set[str], requires: dict[str, set[str]]) -> set[str
 
 
 async def predict(db: GraphDB, node_id: str, depth: int = 6, source: str = "what-if") -> dict[str, Any]:
-    rows = await db.run("upstream_bfs", id=node_id, depth=depth)
+    rows = await db.run("upstream_bfs", id=node_id, depth=depth, exclude=sorted(get_settings().non_candidates))
     upstream = rows[0]["upstream"] if rows else []
     services = sorted({node_id, *upstream})
     queues = [r["queue"] for r in await db.run("queues_consumed_by", services=services)]

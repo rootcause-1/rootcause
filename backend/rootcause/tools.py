@@ -119,7 +119,7 @@ class Tools:
         return {"journeys": imp, "evidence": [i["journey"] for i in imp if i["impacted"]]}
 
     async def blast_radius(self, node_id: str) -> dict[str, Any]:
-        rows = await self.db.run("upstream_bfs", id=node_id, depth=6)
+        rows = await self.db.run("upstream_bfs", id=node_id, depth=6, exclude=sorted(self.s.non_candidates))
         up = rows[0]["upstream"] if rows else []
         ctx = await self.db.run("service_risk_context", id=node_id)
         journeys = ctx[0]["journeys"] if ctx else []

@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from rootcause.graph.client import GraphDB
+from rootcause.settings import get_settings
 
 RISK_ORDER = {"none": 0, "low": 1, "medium": 2, "high": 3}
 
@@ -42,7 +43,7 @@ async def assess_flag(db: GraphDB, flag: str) -> dict[str, Any]:
 
 
 async def assess_restart(db: GraphDB, service: str, stateful_stores: list[str], high_pct: float) -> dict[str, Any]:
-    up = await db.run("upstream_bfs", id=service, depth=6)
+    up = await db.run("upstream_bfs", id=service, depth=6, exclude=sorted(get_settings().non_candidates))
     upstream = up[0]["upstream"] if up else []
     ctx = await db.run("service_risk_context", id=service)
     datastores = ctx[0]["datastores"] if ctx else []

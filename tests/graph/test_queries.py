@@ -33,7 +33,7 @@ COMMON = {
     "action": None, "resolution": "test", "markdown": "# r", "path": "r.md", "similar": [], "batch": "b",
     "variant": "on", "truth": "payment", "class": "errors", "seed": 1, "verdict": "payment", "top1": True,
     "top3": True, "ttd_ms": 1000, "incident_id": "INC-0001", "results": "{}", "miss_reason": None, "run": "R1",
-    "stale_before": NOW,
+    "stale_before": NOW, "exclude": [],
 }
 ROWS = {
     "upsert_services": [{"id": "x", "rps": 1.0, "err_rate": 0.0, "self_err_rate": 0.0, "p95_ms": 1.0,
@@ -109,8 +109,8 @@ async def test_evidence_path(db):
 
 async def test_upstream_bfs_and_betweenness(db):
     await fixtures.build(db)
-    up = (await db.run("upstream_bfs", id="payment", depth=6))[0]["upstream"]
-    assert {"checkout", "frontend", "frontend-proxy"} <= set(up)
+    up = (await db.run("upstream_bfs", id="payment", depth=6, exclude=["frontend-proxy"]))[0]["upstream"]
+    assert {"checkout", "frontend"} <= set(up) and "frontend-proxy" not in up  # excluded
     scores = {r["id"]: r["score"] for r in await db.run("service_betweenness")}
     assert scores["checkout"] >= scores["payment"]
 

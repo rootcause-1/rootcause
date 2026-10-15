@@ -78,7 +78,7 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `upsert_messaging` | [upsert_messaging.cypher](../backend/rootcause/graph/queries/upsert_messaging.cypher) | Write PRODUCES_TO / CONSUMED_BY edges and per-queue produce/consume rates from messaging spans | - |
 | `upsert_services` | [upsert_services.cypher](../backend/rootcause/graph/queries/upsert_services.cypher) | Write per-service span metrics for the current window (rps, error rates, p95) | - |
 | `upsert_uses` | [upsert_uses.cypher](../backend/rootcause/graph/queries/upsert_uses.cypher) | Write USES edges to datastores/caches from db client spans, plus per-datastore aggregates | - |
-| `upstream_bfs` | [upstream_bfs.cypher](../backend/rootcause/graph/queries/upstream_bfs.cypher) | Everything upstream of a node (who calls it, transitively) via CALLED_BY: blast radius and prediction | algo.bfs |
+| `upstream_bfs` | [upstream_bfs.cypher](../backend/rootcause/graph/queries/upstream_bfs.cypher) | Everything upstream of a node (who calls it, transitively) via CALLED_BY: blast radius and prediction. | algo.bfs |
 | `vanished_consumers` | [vanished_consumers.cypher](../backend/rootcause/graph/queries/vanished_consumers.cypher) | Invisible fault: consumers of an anomalous queue whose CONSUMED_BY edge stopped being refreshed (no consumer spans) | - |
 | `who_owns` | [who_owns.cypher](../backend/rootcause/graph/queries/who_owns.cypher) | Owning team of a node and its people (who is on call) | - |
 | `write_hypotheses` | [write_hypotheses.cypher](../backend/rootcause/graph/queries/write_hypotheses.cypher) | Replace an incident's ranked Hypothesis nodes (score + the five signal components) | - |

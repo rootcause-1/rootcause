@@ -80,3 +80,13 @@ def test_llm_latency_needs_absolute_floor():
     c = {**C, "llm_latency_min_ms": 1000}
     assert evaluate("Service", {"llm_p95_ms": 44.0, "bl_llm_p95_ms": 20.0}, c)["llm_latency"] is None
     assert evaluate("Service", {"llm_p95_ms": 5100.0, "bl_llm_p95_ms": 20.0}, c)["llm_latency"] is not None
+
+
+def test_latency_and_lag_need_enough_data():
+    c = {**C, "latency_min_samples": 5, "lag_min_messages": 3}
+    few = {"rps": 0.05, "p95_ms": 232.0, "bl_p95_ms": 69.0, "server_spans": 3}
+    assert evaluate("Service", few, c)["latency"] is None
+    assert evaluate("Service", {**few, "server_spans": 12}, c)["latency"] is not None
+    q = {"produce_rate": 0.02, "consume_rate": 0.04, "lag": 1.0, "lag_slope": 2.0}
+    assert evaluate("Queue", q, c)["lag"] is None
+    assert evaluate("Queue", {**q, "lag": 6.0}, c)["lag"] is not None
