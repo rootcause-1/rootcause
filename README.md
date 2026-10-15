@@ -88,7 +88,13 @@ with their purpose in [docs/QUERIES.md](docs/QUERIES.md). The core ones:
 | [recent_changes_for](backend/rootcause/graph/queries/recent_changes_for.cypher) | – | flag changes that AFFECT a node |
 
 ## Scorecard
-Generated from blind chaos runs by `make chaos N=15`: [docs/SCORECARD.md](docs/SCORECARD.md). _No runs yet._
+Blind chaos runs on the live demo (`make chaos N=15`): the harness flips a random catalogue flag, the engine is not
+told, and the settled verdict is scored against the catalogue truth, next to simple baselines on the same alerts.
+Full table, per-class breakdown and every miss: [docs/SCORECARD.md](docs/SCORECARD.md) (copied below by
+`scripts/sync_readme_scorecard.py`, never typed).
+
+<!-- scorecard:start -->
+<!-- scorecard:end -->
 
 ## Use it from Claude Desktop (MCP)
 With `make up` running, add to `claude_desktop_config.json`:
