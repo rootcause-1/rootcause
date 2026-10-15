@@ -9,6 +9,8 @@ approval, verifies recovery, writes the report and remembers the incident.
 
 Architecture diagram and how each part works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+![RootCause during a live paymentFailure: 4 alerts become 1 incident, evidence path highlighted on the graph, low-risk fix proposed](docs/img/ui-incident.jpg)
+
 > Status (16 Oct 2026): acceptance checks M0–M7 pass against the real OpenTelemetry Demo, M8 (MCP) is verified with
 > an MCP client; every catalogue fault was broken by hand and what RootCause saw is in
 > [chaos/catalogue.yaml](backend/rootcause/chaos/catalogue.yaml). Evidence: [docs/PROGRESS.md](docs/PROGRESS.md).
@@ -73,7 +75,7 @@ graph LR
 | **Edges** | CALLS, CALLED_BY, PRODUCES_TO, CONSUMED_BY, USES, RUNS_IN, REQUIRES, OWNS, MEMBER_OF, FOR, REMEDIATES, AFFECTS, CHANGED, FIRED_ON, PART_OF, BLAMES (transient), ROOT_CAUSE, CAUSED_BY, IMPACTED, RESOLVED_BY, HAS_SIGNAL, SIMILAR_TO, HAS_REPORT, HAS_HYPOTHESIS, INVESTIGATED_BY, NEXT, CITED, PREDICTS, PRODUCED |
 
 ## Queries and algorithms we depend on
-All 73 queries are named `.cypher` files in [backend/rootcause/graph/queries/](backend/rootcause/graph/queries/), listed
+All 76 queries are named `.cypher` files in [backend/rootcause/graph/queries/](backend/rootcause/graph/queries/), listed
 with their purpose in [docs/QUERIES.md](docs/QUERIES.md). The core ones:
 
 | Query | Algorithm | Purpose |
