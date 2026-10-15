@@ -10,7 +10,7 @@ import uuid
 import pytest
 from falkordb.asyncio import FalkorDB
 
-from rootcause.chaos.runner import load_catalogue
+from rootcause.chaos.runner import load_catalogue, truths
 from rootcause.graph.client import GraphDB
 from rootcause.graph.schema import ensure_indexes, load_seed
 from rootcause.ingest.tick import Runtime
@@ -20,7 +20,7 @@ from rootcause.settings import get_settings
 pytestmark = pytest.mark.scenario
 S = get_settings()
 SCENARIOS = list_scenarios(S.rc_replay_dir)
-TRUTH = {e["flag"]: e["truth"] for e in load_catalogue()}
+TRUTH = {e["flag"]: truths(e["truth"]) for e in load_catalogue()}
 
 
 @pytest.mark.skipif(not SCENARIOS, reason="no recordings in replay/ yet (make record SCENARIO=...)")
@@ -46,6 +46,6 @@ async def test_top1_matches_truth(falkor_addr, scenario):
         main = max(rows, key=lambda r: (len(r.get("members") or []), r.get("confidence") or 0))
         hyps = (await db.run("get_incident", id=main["id"]))[0]["hyps"]
         top = sorted([h for h in hyps if h.get("target")], key=lambda h: h["rank"])[0]["target"]
-        assert top == TRUTH[flag], f"{scenario}: top-1 {top}, truth {TRUTH[flag]}"
+        assert top in TRUTH[flag], f"{scenario}: top-1 {top}, truth {TRUTH[flag]}"
     finally:
         await db.delete()

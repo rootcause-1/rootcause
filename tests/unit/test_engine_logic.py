@@ -130,3 +130,13 @@ def test_scorecard_render_counts_from_runs():
     assert "| rootcause | 50% | 100% | 40 s | 2 |" in md
     assert "| first_alert | 50% | 50% | - | 2 |" in md
     assert "truth ranked 2" in md
+
+
+def test_any_of_truth():
+    from rootcause.chaos.runner import truths
+    from rootcause.chaos.scorecard import hit
+
+    assert truths(["fraud-detection", "checkout"]) == ["fraud-detection", "checkout"]
+    assert truths("payment") == ["payment"]
+    assert hit(["checkout", "x"], "fraud-detection | checkout", 1) is True
+    assert hit(["x", "y", "z", "checkout"], "fraud-detection | checkout", 3) is False

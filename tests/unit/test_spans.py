@@ -195,3 +195,11 @@ def test_slowest_route_p95():
     st = run(spans)
     shipping = {x["id"]: x for x in st.services}["shipping"]
     assert shipping["p95_ms"] < 10 and shipping["op_p95_ms"] == 5000
+
+
+def test_consumer_spans_are_inbound_work():
+    # a throttled Kafka consumer (3 s per record) must look like a slow service
+    spans = [sp("t", f"c{i}", "", "fraud-detection", CONSUMER, dur=3000, name="process orders",
+                **{"messaging.system": "kafka", "messaging.destination.name": "orders"}) for i in range(6)]
+    f = {x["id"]: x for x in run(spans).services}["fraud-detection"]
+    assert f["rps"] > 0 and f["p95_ms"] == 3000 and f["server_spans"] == 6

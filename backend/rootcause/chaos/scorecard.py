@@ -19,7 +19,7 @@ METHODS = ("rootcause", "graph_off", "llm_no_graph", "loudest_alert", "first_ale
 def hit(ranked: list[str] | None, truth: str, k: int) -> bool | None:
     if ranked is None:
         return None
-    return truth in ranked[:k]
+    return any(t.strip() in ranked[:k] for t in truth.split(" | "))
 
 
 def render(runs: list[dict[str, Any]], batch: str) -> str:

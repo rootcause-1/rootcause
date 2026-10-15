@@ -15,7 +15,7 @@
 - {flag: adManualGc, variant: "on", off: "off", truth: ad, class: latency}
 - {flag: emailMemoryLeak, variant: "100x", off: "off", truth: email, class: invisible}
 - {flag: recommendationCacheFailure, variant: "on", off: "off", truth: recommendation, class: invisible}
-- {flag: kafkaQueueProblems, variant: "3sec", off: "off", truth: fraud-detection, class: invisible}   # docs: "slows the fraud consumer by a per-record delay"; BLAMES makes a lagging queue blame its consumer.
+- {flag: kafkaQueueProblems, variant: "3sec", off: "off", truth: [fraud-detection, checkout], class: invisible}   # two effects in the demo source: checkout floods `orders` with N extra copies per order (checkout/main.go) and fraud-detection sleeps N ms per record (fraud-detection/main.kt); either is a correct root (decided from source before re-running)
 - {flag: kafkaConsumerDead, variant: "on", off: "off", truth: fraud-detection, class: invisible}   # docs: "removes fraud detection from the orders consumer group"
 - {flag: aiRunawayAgent, variant: "on", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True
 - {flag: aiSlowResponse, variant: "5sec", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True

@@ -34,6 +34,13 @@ log = logging.getLogger(__name__)
 CATALOGUE = Path(__file__).parent / "catalogue.yaml"
 
 
+def truths(truth: Any) -> list[str]:
+    """A catalogue truth is one node id, or a list when a fault has two genuine origins (stored joined by ' | ')."""
+    if isinstance(truth, list):
+        return [str(t) for t in truth]
+    return [t.strip() for t in str(truth).split(" | ")]
+
+
 def load_catalogue() -> list[dict[str, Any]]:
     return yaml.safe_load(CATALOGUE.read_text(encoding="utf-8")) or []
 
@@ -137,14 +144,16 @@ class ChaosRunner:
         self._set(entry["flag"], entry.get("off", "off"))
         await self._wait(self._no_open, 180)
 
-        truth = entry["truth"]
+        ok = truths(entry["truth"])
+        truth = " | ".join(ok)
         verdict = ranked[0] if ranked else None
-        top1, top3 = verdict == truth, truth in ranked[:3]
+        top1, top3 = verdict in ok, any(t in ranked[:3] for t in ok)
         miss = None
         if not incident_id:
             miss = "no incident with a verdict within 180 s (fault not visible?)"
         elif not top1:
-            miss = f"truth ranked {ranked.index(truth) + 1}" if truth in ranked else "truth not among candidates"
+            pos = [ranked.index(t) + 1 for t in ok if t in ranked]
+            miss = f"truth ranked {min(pos)} (top-1 was {verdict})" if pos else f"truth not among candidates (top-1 was {verdict})"
         return {"id": run_id, "batch": batch, "flag": entry["flag"], "variant": entry["variant"], "truth": truth,
                 "class": entry.get("class"), "now": now_ms(), "seed": seed, "verdict": verdict, "top1": top1,
                 "top3": top3, "ttd_ms": (int(verdict_inc["verdict_ts"]) - t0) if verdict_inc else None,

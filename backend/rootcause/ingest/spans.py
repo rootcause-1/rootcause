@@ -10,6 +10,8 @@ Rules (CLAUDE.md §7.1):
 - CLIENT span with db.system -> USES edge to a datastore (`db:<name>` or `cache:<host>`).
 - PRODUCER -> PRODUCES_TO queue, CONSUMER -> CONSUMED_BY.
 - Self-error: an error span (server/internal/consumer) whose children in the window are all non-error.
+- Inbound work = SERVER and CONSUMER spans: they give a service its rps, error rate and p95 (a slow Kafka consumer
+  shows up as a slow service).
 - Spans are only aggregated once they are `finalise_lag_ms` old, so late children can still arrive.
 """
 
@@ -212,7 +214,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
                 if s.service not in cfg.non_candidates:
                     flag_evals.add((key, s.service))
 
-            if s.kind == SERVER:
+            if s.kind in (SERVER, CONSUMER):  # inbound work: a request served, or a message consumed
                 failed = _handler_failed(s, children)
                 svc_server[s.service] += 1
                 svc_lat[s.service].append(s.duration_ms)
