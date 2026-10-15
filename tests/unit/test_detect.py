@@ -181,3 +181,10 @@ async def test_baselines_adapt_slowly_after_learning():
     cfg = {**C, "learn_seconds": 0, "ewma_alpha": 0.1, "ewma_alpha_live": 0.01, "hold_ticks": 2, "resolve_ticks": 3}
     await Detector(FakeDB(), cfg, set()).run(1_000_000, incidents_open=False)
     assert abs(written["bl_mem_slope"] - 0.2) < 1e-9   # 1 % step towards 20, not 10 %
+
+
+def test_route_p95_counts_when_service_has_few_requests():
+    c = {**C, "latency_min_samples": 10, "latency_sigma": 3.0}
+    checkout = {"rps": 0.15, "server_spans": 9, "p95_ms": 1390.0, "bl_p95_ms": 60.0,
+                "op_p95_ms": 1390.0, "bl_op_p95_ms": 60.0, "bl_op_p95_ms_dev": 10.0}
+    assert evaluate("Service", checkout, c)["latency"].value == 1390.0
