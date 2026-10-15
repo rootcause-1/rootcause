@@ -28,7 +28,7 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `get_runbook` | [get_runbook.cypher](../backend/rootcause/graph/queries/get_runbook.cypher) | Runbooks FOR a node and the signal patterns they REMEDIATE | - |
 | `get_steps` | [get_steps.cypher](../backend/rootcause/graph/queries/get_steps.cypher) | The investigation trail of an incident in order, with cited node ids | - |
 | `graph_edges` | [graph_edges.cypher](../backend/rootcause/graph/queries/graph_edges.cypher) | UI snapshot: CALLS, USES, PRODUCES_TO, CONSUMED_BY and BLAMES edges with live metrics | - |
-| `graph_nodes` | [graph_nodes.cypher](../backend/rootcause/graph/queries/graph_nodes.cypher) | UI snapshot: services, queues and datastores with live metrics and anomaly flag | - |
+| `graph_nodes` | [graph_nodes.cypher](../backend/rootcause/graph/queries/graph_nodes.cypher) | UI snapshot: services, queues and datastores that take part in traffic (or are anomalous), with live metrics | - |
 | `group_incidents` | [group_incidents.cypher](../backend/rootcause/graph/queries/group_incidents.cypher) | Group anomalous nodes into incidents = weakly connected components of the BLAMES subgraph | algo.WCC |
 | `impact_journeys` | [impact_journeys.cypher](../backend/rootcause/graph/queries/impact_journeys.cypher) | Journeys that REQUIRE any failing node, with current vs baseline success rate | - |
 | `incident_actions` | [incident_actions.cypher](../backend/rootcause/graph/queries/incident_actions.cypher) | All actions of an incident in proposal order | - |

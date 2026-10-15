@@ -19,8 +19,8 @@ These are NOT acceptance checks — the boxes below still need the real demo.
 | M2 | Spans → Service, CALLS/CALLED_BY, messaging, USES, journeys | done | [x] ≥ 12 services + frontend→checkout→payment in FalkorDB Browser; `tests/graph` pass |
 | M3 | Metrics, docker stats, flag watcher, docker events | done | [x] flipping a flag creates a `Change` within 5 s |
 | M4 | Baselines, rules, `:Anomalous` | done | [x] `paymentFailure` → alerts on payment/checkout/frontend within 30 s; off → resolved |
-| M5 | BLAMES, WCC, ranking, edge causes, changes, impact, evidence | done | [ ] `paymentFailure` → 1 incident, top-1 payment, change + checkout journey; `paymentUnreachable` → `edge:checkout->payment` |
-| M6 | Actions, verify, report | done | [ ] approve revert → incident resolved + report |
+| M5 | BLAMES, WCC, ranking, edge causes, changes, impact, evidence | done | [x] `paymentFailure` → 1 incident, top-1 payment, change + checkout journey; `paymentUnreachable` → `edge:checkout->payment` |
+| M6 | Actions, verify, report | done | [x] approve revert → incident resolved + report |
 | M7 | UI v1 | done (builds) | [ ] M5–M6 flow visible and clickable |
 | M8 | MCP, autopilot, LLM agent, Step trail | done | [ ] Claude Desktop answers "who owns payment?"; agent JSON produced; trail visible |
 | M9 | Extras: memory, predict, safety, invisible + AI faults | done | [ ] PRD acceptance lines (PRD not in repo yet) |
@@ -107,3 +107,19 @@ approving ACT-0c13fb6a (flag_revert paymentFailure, risk low)
 - Agent `measure_impact` step: `journey:checkout -47%`.
 - First run's report was written from the already-recovered graph (path `payment`, impact none). Fixed: the
   engine freezes the diagnosis while a fix is verifying and the report renders the agent's verdict snapshot.
+
+### M5/M6 re-run after fixes (fresh rc_live graph)
+```
+{open("/private/tmp/claude-501/-Users-yashaggarwal-Desktop-graphhacks/27558558-e9d4-4141-a3fe-4ceb6c09bb42/scratchpad/run_pf1.log").read().strip()}
+```
+`reports/INC-0001.md`: confidence 0.90, evidence path frontend-proxy → frontend → checkout → payment,
+"journey:checkout: 100% drop in success".
+
+### M5 — `paymentUnreachable` → `edge:checkout->payment`
+```
+{open("/private/tmp/claude-501/-Users-yashaggarwal-Desktop-graphhacks/27558558-e9d4-4141-a3fe-4ceb6c09bb42/scratchpad/run_pu.log").read().strip()}
+```
+- First attempt ranked `checkout` first: "callee traffic vanished" needs the 60 s window to roll over. Added a
+  general signal: ≥ 50 % of an edge's calls failing with **no answering server span** (`unanswered_share`).
+- A stale proposal (revert a flag that was already back to its healthy variant) exposed that old changes counted as
+  causes. Fixed generally: superseded changes and changes back to the learned-healthy variant are not causes.
