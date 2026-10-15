@@ -45,7 +45,10 @@ export default function GraphView({ graph, overlays }: { graph: Graph | null; ov
     cy.current = cytoscape({ container: box.current, style, wheelSensitivity: 0.2 });
     (window as unknown as { __cy?: Core }).__cy = cy.current; // debugging handle
     const t = setInterval(() => cy.current?.nodes(".anomalous").toggleClass("pulse"), 700);
-    return () => { clearInterval(t); cy.current?.destroy(); };
+    // the panel changes size between tabs (full height on Incident, 45vh elsewhere): keep the canvas in sync
+    const ro = new ResizeObserver(() => { cy.current?.resize(); cy.current?.fit(undefined, 30); });
+    ro.observe(box.current);
+    return () => { clearInterval(t); ro.disconnect(); cy.current?.destroy(); };
   }, []);
 
   useEffect(() => {
