@@ -17,7 +17,7 @@ site (same code path, recorded telemetry). Screen: 1920×1080, UI at `localhost:
 | 1:50–2:10 | Action card: *flag revert paymentFailure — risk low*, restart *risk high* (needs typed `RESTART payment`). Click **Approve**. Status: executed → verified. | "It proposes the lowest-risk fix. Risk comes from the graph: blast radius by BFS, betweenness, stateful stores. A human approves; RootCause executes, then verifies recovery." |
 | 2:10–2:25 | Reports tab: the generated report (root cause, confidence, path, change, impact, timeline). | "It writes the post-incident report from the graph." |
 | 2:25–2:40 | Break it again. The new incident shows *Similar past incidents: INC-0001 — strong match*, memory bar on payment, past fix proposed first. | "Next time, it remembers: Jaccard over shared signal patterns finds the past incident and its fix." |
-| 2:40–2:55 | `docs/SCORECARD.md` (or Chaos lab scorecard): RootCause vs loudest alert, first alert, highest error, and graph signals off — top-1 / top-3 / time to diagnosis, misses listed. | "Blind chaos runs on the real demo. Without the graph signals, accuracy drops — the graph is doing the work." |
+| 2:40–2:55 | `docs/SCORECARD.md`: 15 blind runs — RootCause 87 % top-1 / 93 % top-3, median 53 s; graph signals off 80 %; loudest / first / highest-error alert 40 %; the two misses listed. | "Fifteen blind chaos runs on the real demo: 87 percent top-1, against 40 percent for the usual alert heuristics. Turn the graph signals off and it drops. And we list our misses." |
 | 2:55–3:00 | URL + repo + "FalkorDB · Track 01: Agents That Act on Connected Data". | "RootCause. Try the replay at the link below." |
 
 ## Recording checklist

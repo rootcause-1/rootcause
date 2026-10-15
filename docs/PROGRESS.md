@@ -24,7 +24,7 @@ These are NOT acceptance checks — the boxes below still need the real demo.
 | M7 | UI v1 | done | [x] M5–M6 flow visible and clickable |
 | M8 | MCP, autopilot, LLM agent, Step trail | done | [~] Claude Desktop answers "who owns payment?"; agent JSON produced; trail visible |
 | M9 | Extras: memory, predict, safety, invisible + AI faults | done | [x] PRD acceptance lines (PRD not in repo yet) |
-| M10 | Chaos runner, baselines, scorecard, recorder, golden tests | done | [~] `make chaos N=15` writes SCORECARD.md; `make scenario-test` green |
+| M10 | Chaos runner, baselines, scorecard, recorder, golden tests | done | [x] `make chaos N=15` writes SCORECARD.md; `make scenario-test` green |
 | M11 | Replay deployment, docs, README | done | [x] fresh VM: one command → public URL in REPLAY |
 
 ## VERIFY items (CLAUDE.md §5) — resolved 2026-10-15 against the live demo
@@ -215,4 +215,4 @@ no incident is a miss for every method. Scorecards are generated (never typed); 
 |---|---|---|---|---|
 | 1 `20261015_194536` | after the flag sweep | **80 % / 87 %** (median 54 s) | graph_off 73 %, first_alert 47 %, loudest 33 % | 2 of 3 misses were a harness race: a noise alert opened an incident seconds before the flip and the fault's alerts joined it. Fixed: ≥ 2 failed requests per error alert, latency floor 100 ms, runner scores the incident the fault joined. |
 | 2 `20261015_205332` | + those fixes | aborted after 5 runs | – | regression found: the new latency guards hid emailMemoryLeak's latency, the 2-min memory hold exceeded the 180 s window, and the fast EWMA had absorbed earlier undetected leaks into the baseline. Fixed: memory hold 60 s on top of the 2-min slope, EWMA α 0.01 after learning, sample gate only on the service-wide p95. |
-| 3 | final | see `docs/SCORECARD.md` | | |
+| 3 `20261015_213046` | final | **87 % / 93 %** (median 53 s) | graph_off 80 %, loudest/first/highest-error 40 % | misses: kafkaQueueProblems (the DB flood formed its own incident) and productCatalogLockContention (DB ranked #1, truth #2). `docs/SCORECARD.md`. |

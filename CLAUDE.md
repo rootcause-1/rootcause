@@ -548,7 +548,8 @@ Before M10, break **every** catalogue flag once by hand, write what you observe 
   truth #2). Observations are comments in `chaos/catalogue.yaml`.
 - Recordings: 6 scenarios in `replay/` (~4 MB each). Public replay site: http://3.234.90.242/ (AWS, `docs/DEPLOY.md`);
   **pushing to `main` redeploys it** (pull-based timer on the host).
-- `make chaos N=15` was started 16 Oct ~01:15 IST; `docs/SCORECARD.md` is generated from it.
+- Final blind chaos batch (`make chaos N=15`, 16 Oct): RootCause 87 % top-1 / 93 % top-3, median 53 s; graph_off 80 %,
+  alert heuristics 40 % (`docs/SCORECARD.md`, history in `docs/scorecards/` and `docs/PROGRESS.md`). `llm_no_graph` not run (no API key).
 
 **Verified facts you must not undo** (each has a test): OTLP bodies are gzip; peers come from `rpc.method`; journeys
 start at the first shop span under the traced load generator/browser; flag evaluations are span events →
