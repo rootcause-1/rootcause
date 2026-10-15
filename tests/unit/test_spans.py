@@ -172,3 +172,17 @@ def test_flag_evaluation_events_become_affects_rows():
     assert spans[0].flag_keys == ("cartFailure",)
     st = run(spans)
     assert st.flag_affects == [{"flag": "cartFailure", "svc": "cart"}]
+
+
+def test_4xx_with_failing_handler_counts_as_failure():
+    # demo frontend: failed checkout -> HTTP 422 on the server span, exception on an inner span
+    st = run([
+        sp("t", "1", "", "frontend", SERVER, **{"http.route": "/api/checkout", "http.status_code": "422"}),
+        sp("t", "2", "1", "frontend", INTERNAL, err=True),
+        sp("t", "3", "", "frontend", SERVER, **{"http.route": "/api/checkout", "http.status_code": "404"}),
+        sp("t", "4", "", "frontend", SERVER, **{"http.route": "/api/cart"}),
+        sp("t", "5", "", "frontend", SERVER, **{"http.route": "/api/cart"}),
+    ])
+    f = {x["id"]: x for x in st.services}["frontend"]
+    assert f["err_rate"] == 0.25         # 1 of 4 server spans: only the 422 with a failing handler
+    assert f["op_err_rate"] == 0.5       # /api/checkout: 1 of 2

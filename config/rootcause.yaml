@@ -57,6 +57,7 @@ detect:
   learn_seconds: 180
   ewma_alpha: 0.1
   hold_ticks: 2                              # a rule must hold this many consecutive ticks
+  hold_ticks_by_kind: {memory: 24}           # memory slope must hold 2 min (24 x 5 s ticks), CLAUDE.md §7.4
   resolve_ticks: 3                           # healthy ticks before an alert resolves
   min_rps: 0.02                              # ignore error/latency rules on nodes with less traffic (real demo: checkout/payment run at ~0.03 rps)
   error_sigma: 3.0
@@ -68,6 +69,7 @@ detect:
   cpu_pct: 85
   agent_loop_factor: 3.0
   llm_latency_factor: 2.0
+  llm_latency_min_ms: 1000                   # an LLM reply under 1 s is never an incident (VCR replays answer in ~20 ms)
 
 engine:
   agent_delay_seconds: 15                    # let an incident gather alerts before investigating

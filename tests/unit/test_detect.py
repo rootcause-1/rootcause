@@ -68,3 +68,15 @@ def test_hysteresis_counters():
     for _ in range(3):
         hit, ok = step_counters(False, hit, ok)
     assert (hit, ok) == (0, 3)  # resolves at resolve_ticks=3
+
+
+def test_route_error_rate_fires_when_service_rate_is_diluted():
+    # busy frontend: 0.2% service-wide errors, but /api/checkout fails 100%
+    p = {"rps": 15.0, "err_rate": 0.002, "bl_err_rate": 0.0, "op_err_rate": 1.0, "bl_op_err_rate": 0.0}
+    assert evaluate("Service", p, C)["error_rate"].value == 1.0
+
+
+def test_llm_latency_needs_absolute_floor():
+    c = {**C, "llm_latency_min_ms": 1000}
+    assert evaluate("Service", {"llm_p95_ms": 44.0, "bl_llm_p95_ms": 20.0}, c)["llm_latency"] is None
+    assert evaluate("Service", {"llm_p95_ms": 5100.0, "bl_llm_p95_ms": 20.0}, c)["llm_latency"] is not None

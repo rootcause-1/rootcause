@@ -40,6 +40,7 @@ class IngestConfig:
     journey_critical_share: float = 0.9
     agent_workflow_span: str = "astronomy_shop_agent_workflow"
     non_candidates: frozenset[str] = frozenset()
+    op_min_spans: int = 2              # routes with fewer server spans in the window are too noisy to rate
 
 
 @dataclass
@@ -80,12 +81,33 @@ def _route(span: Span) -> str:
     return span.name
 
 
-def _http_failed(span: Span) -> bool:
+def _status(span: Span) -> int | None:
     code = span.attrs.get("http.response.status_code", span.attrs.get("http.status_code"))
     try:
-        return span.error or (code is not None and int(code) >= 500)
+        return int(code) if code is not None else None
     except (TypeError, ValueError):
-        return span.error
+        return None
+
+
+def _handler_failed(span: Span, children: dict[str, list[Span]]) -> bool:
+    """Did the request fail? Error status, a 5xx, or a 4xx whose own handler (same-service descendant) errored.
+    The demo frontend answers a failed checkout with HTTP 422 and records the exception on an inner span."""
+    if span.error:
+        return True
+    code = _status(span)
+    if code is None or code < 400:
+        return False
+    if code >= 500:
+        return True
+    stack = list(children.get(span.span_id, []))
+    while stack:
+        k = stack.pop()
+        if k.service != span.service:
+            continue
+        if k.error:
+            return True
+        stack.extend(children.get(k.span_id, []))
+    return False
 
 
 class SpanWindow:
@@ -143,6 +165,8 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
     svc_server_err: Counter[str] = Counter()
     svc_self_err: Counter[str] = Counter()
     svc_lat: dict[str, list[float]] = defaultdict(list)
+    op_n: Counter[tuple[str, str]] = Counter()
+    op_err: Counter[tuple[str, str]] = Counter()
     svc_any: set[str] = set()
 
     call_n: Counter[tuple[str, str]] = Counter()
@@ -187,10 +211,14 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
                     flag_evals.add((key, s.service))
 
             if s.kind == SERVER:
+                failed = _handler_failed(s, children)
                 svc_server[s.service] += 1
                 svc_lat[s.service].append(s.duration_ms)
-                if s.error:
+                op = (s.service, _route(s))
+                op_n[op] += 1
+                if failed:
                     svc_server_err[s.service] += 1
+                    op_err[op] += 1
             if s.error and s.kind in (SERVER, INTERNAL, CONSUMER) and not any(k.error for k in kids):
                 svc_self_err[s.service] += 1
 
@@ -254,10 +282,17 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
             if not journey:
                 continue
             j_total[journey] += 1
-            if not _http_failed(s):
+            if not _handler_failed(s, children):
                 j_ok[journey] += 1
             for svc in {x.service for x in spans}:
                 j_touch[journey][svc] += 1
+
+    # worst endpoint per service: a failing low-traffic route (e.g. /api/checkout) is invisible in the service-wide
+    # error rate of a busy frontend, so the detector also watches the max per-route error rate
+    op_worst: dict[str, float] = defaultdict(float)
+    for (svc, _op), n in op_n.items():
+        if n >= cfg.op_min_spans:
+            op_worst[svc] = max(op_worst[svc], op_err[(svc, _op)] / n)
 
     st = WindowStats(span_count=count)
     st.flag_affects = [{"flag": f, "svc": svc} for f, svc in sorted(flag_evals)]
@@ -267,6 +302,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
             "id": svc,
             "rps": n / secs,
             "err_rate": (svc_server_err[svc] / n) if n else 0.0,
+            "op_err_rate": op_worst.get(svc, 0.0),
             "self_err_rate": min(1.0, svc_self_err[svc] / n) if n else (1.0 if svc_self_err[svc] else 0.0),
             "p95_ms": p95(svc_lat[svc]),
             "server_spans": n,

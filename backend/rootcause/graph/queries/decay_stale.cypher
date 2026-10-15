@@ -2,7 +2,7 @@
 // algorithm: -
 MATCH (s:Service)
 WHERE s.last_seen < $cutoff AND s.rps > 0
-SET s.rps = 0.0, s.server_spans = 0, s.err_rate = 0.0, s.self_err_rate = 0.0
+SET s.rps = 0.0, s.server_spans = 0, s.err_rate = 0.0, s.self_err_rate = 0.0, s.op_err_rate = 0.0
 ;
 MATCH ()-[c:CALLS]->()
 WHERE c.last_seen < $cutoff AND c.rps > 0

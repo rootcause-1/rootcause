@@ -49,12 +49,16 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
     rps = _f(p, "rps", 0.0) or 0.0
     busy = rps >= c["min_rps"]
 
-    if "error_rate" in out:
-        err, bl, dev = _f(p, "err_rate"), _f(p, "bl_err_rate", 0.0), _f(p, "bl_err_rate_dev", 0.0)
-        if err is not None and busy:
+    if "error_rate" in out and busy:
+        # service-wide error rate, then the worst single route (op_err_rate), each against its own baseline
+        for metric in ("err_rate", "op_err_rate"):
+            err, bl, dev = _f(p, metric), _f(p, f"bl_{metric}", 0.0), _f(p, f"bl_{metric}_dev", 0.0)
+            if err is None:
+                continue
             thr = max(bl + c["error_sigma"] * dev, bl + c["error_floor"])
             if err > thr:
                 out["error_rate"] = Breach("error_rate", err, thr, bl, dev)
+                break
 
     if "latency" in out:
         lat, bl, dev = _f(p, "p95_ms"), _f(p, "bl_p95_ms"), _f(p, "bl_p95_ms_dev", 0.0)
@@ -82,8 +86,9 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
 
     if "llm_latency" in out:
         lat, bl = _f(p, "llm_p95_ms"), _f(p, "bl_llm_p95_ms")
-        if lat is not None and bl and lat > c["llm_latency_factor"] * bl:
-            out["llm_latency"] = Breach("llm_latency", lat, c["llm_latency_factor"] * bl, bl,
+        thr = max(c["llm_latency_factor"] * (bl or 0.0), c.get("llm_latency_min_ms", 0.0))
+        if lat is not None and bl and lat > thr:
+            out["llm_latency"] = Breach("llm_latency", lat, thr, bl,
                                         _f(p, "bl_llm_p95_ms_dev", 0.0))
 
     if "lag" in out:
@@ -135,7 +140,8 @@ class Detector:
                                             int(props.get(f"ok_{kind}", 0)))
                     updates[f"hit_{kind}"], updates[f"ok_{kind}"] = hit, ok
                     alert = firing.get((nid, kind))
-                    if breach and not alert and hit >= self.c["hold_ticks"]:
+                    hold = int((self.c.get("hold_ticks_by_kind") or {}).get(kind, self.c["hold_ticks"]))
+                    if breach and not alert and hit >= hold:
                         aid = new_id("ALT")
                         await self.db.run("create_alert", id=aid, kind=kind, target=nid, value=breach.value,
                                           threshold=breach.threshold, baseline=breach.baseline, dev=breach.dev,
