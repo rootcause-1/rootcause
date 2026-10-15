@@ -5,7 +5,7 @@ Inputs are events `{"type", "ts", "data"}` of type otlp | prom | docker_stats | 
 calls the very same `feed()` with a time offset, so replayed scenarios go through identical code.
 
 Queries used: upsert_services, upsert_calls, upsert_messaging, upsert_uses, upsert_journeys, set_node_props,
-upsert_flag_affects, upsert_containers, create_flag_change, create_container_change, decay_stale.
+upsert_flag_affects, upsert_containers, set_flag_baselines, create_flag_change, create_container_change, decay_stale.
 """
 
 from __future__ import annotations
@@ -124,6 +124,8 @@ class Pipeline:
 
     async def _flag_config(self, config: dict[str, Any], ts: int) -> None:
         new = flag_watcher.default_variants(config)
+        if self.flags is None:  # first observation = the healthy state the baselines are learned in
+            await self.db.run("set_flag_baselines", flags=[{"id": f, "variant": v} for f, v in new.items()])
         for flag, old, to in flag_watcher.diff_flags(self.flags, new):
             await self.db.run("create_flag_change", id=new_id("CHG"), flag=flag, from_variant=old, to=to, ts=ts,
                               actor=flag_watcher.actor_for(flag, to))

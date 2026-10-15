@@ -181,3 +181,16 @@ async def test_edge_candidate_from_unanswered_calls(db):
                                         "unanswered_share": 0.6}], now=NOW)
     rows = await db.run("edge_candidates", members=["checkout"])
     assert [(r["caller"], r["callee"]) for r in rows] == [("checkout", "payment")]
+
+
+async def test_superseded_and_restoring_changes_are_not_causes(db):
+    await fixtures.build(db)  # CHG-1: paymentFailure off -> 100% two minutes before onset
+    await db.run("set_flag_baselines", flags=[{"id": "paymentFailure", "variant": "off"}])
+    await db.run("create_flag_change", id="CHG-0", flag="paymentFailure", from_variant="off", to="100%",
+                 ts=ONSET - 120_000, actor="unknown")  # set f.variant back to 100% after the baseline write
+    live = await db.run("recent_changes_for", node_id="payment", onset=ONSET, window_ms=1_800_000)
+    assert sorted(r["change"] for r in live) == ["CHG-0", "CHG-1"]
+    await db.run("create_flag_change", id="CHG-2", flag="paymentFailure", from_variant="100%", to="off",
+                 ts=ONSET - 60_000, actor="unknown")
+    live = await db.run("recent_changes_for", node_id="payment", onset=ONSET, window_ms=1_800_000)
+    assert live == []  # CHG-1 superseded, CHG-2 restored the baseline variant

@@ -19,7 +19,7 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `create_incident` | [create_incident.cypher](../backend/rootcause/graph/queries/create_incident.cypher) | Create a new open Incident for a new BLAMES component | - |
 | `create_report` | [create_report.cypher](../backend/rootcause/graph/queries/create_report.cypher) | Save the post-incident Report and link it with HAS_REPORT | - |
 | `decay_stale` | [decay_stale.cypher](../backend/rootcause/graph/queries/decay_stale.cypher) | Zero the live metrics of services, calls, queues and journeys with no spans in the window | - |
-| `edge_candidates` | [edge_candidates.cypher](../backend/rootcause/graph/queries/edge_candidates.cypher) | Connection causes: a caller's calls go unanswered/fail while the callee's server traffic vanished (<= 10% of its baseline) | - |
+| `edge_candidates` | [edge_candidates.cypher](../backend/rootcause/graph/queries/edge_candidates.cypher) | Connection causes: a caller's calls fail while the callee's server traffic vanished (<= 10% of its baseline), | - |
 | `evidence_path` | [evidence_path.cypher](../backend/rootcause/graph/queries/evidence_path.cypher) | Shortest BLAMES path from the incident entry point to the root cause (the evidence chain) | shortestPath (FalkorDB only allows shortestPath inside WITH/RETURN, not in MATCH) |
 | `flag_affects` | [flag_affects.cypher](../backend/rootcause/graph/queries/flag_affects.cypher) | Services a feature flag AFFECTS and its current variant (safety report for a flag revert) | - |
 | `get_action` | [get_action.cypher](../backend/rootcause/graph/queries/get_action.cypher) | Read one Action | - |
@@ -50,7 +50,7 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `read_call_edges` | [read_call_edges.cypher](../backend/rootcause/graph/queries/read_call_edges.cypher) | Read CALLS edges with live metrics and baselines (for edge baselines and UI colouring) | - |
 | `read_detect_inputs` | [read_detect_inputs.cypher](../backend/rootcause/graph/queries/read_detect_inputs.cypher) | Read every alertable node (Service, Queue, Datastore) and Journey with its live metrics and stored baselines | - |
 | `rebuild_blames` | [rebuild_blames.cypher](../backend/rootcause/graph/queries/rebuild_blames.cypher) | Rebuild the transient BLAMES subgraph between :Anomalous nodes (sync calls blame the callee, a lagging queue blames its consumer) | - |
-| `recent_changes_for` | [recent_changes_for.cypher](../backend/rootcause/graph/queries/recent_changes_for.cypher) | Flag changes that hit a node (via FeatureFlag-AFFECTS->node) shortly before an incident's onset | - |
+| `recent_changes_for` | [recent_changes_for.cypher](../backend/rootcause/graph/queries/recent_changes_for.cypher) | Live flag changes that hit a node (via FeatureFlag-AFFECTS->node) shortly before an incident's onset. | - |
 | `recent_container_changes_for` | [recent_container_changes_for.cypher](../backend/rootcause/graph/queries/recent_container_changes_for.cypher) | Container changes (restarts) that hit a service via Service-RUNS_IN->Container shortly before onset | - |
 | `resolve_alert` | [resolve_alert.cypher](../backend/rootcause/graph/queries/resolve_alert.cypher) | Resolve an alert and remove :Anomalous from its node when no firing alert remains on it | - |
 | `resolve_incident` | [resolve_incident.cypher](../backend/rootcause/graph/queries/resolve_incident.cypher) | Resolve an incident (status, time to resolve) and link the Action it was RESOLVED_BY | - |
@@ -63,6 +63,7 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `service_risk_context` | [service_risk_context.cypher](../backend/rootcause/graph/queries/service_risk_context.cypher) | Datastores a service USES and journeys that REQUIRE it (restart side effects, statefulness) | - |
 | `set_action_props` | [set_action_props.cypher](../backend/rootcause/graph/queries/set_action_props.cypher) | Merge properties onto an Action (approval token hash, status, result) | - |
 | `set_call_baselines` | [set_call_baselines.cypher](../backend/rootcause/graph/queries/set_call_baselines.cypher) | Persist learned baselines (baseline_err, baseline_p95) on CALLS edges | - |
+| `set_flag_baselines` | [set_flag_baselines.cypher](../backend/rootcause/graph/queries/set_flag_baselines.cypher) | Remember each flag's variant at first observation (the healthy state baselines are learned in) | - |
 | `set_incident_props` | [set_incident_props.cypher](../backend/rootcause/graph/queries/set_incident_props.cypher) | Merge properties onto an incident (agent verdict JSON, state, confidence) | - |
 | `set_node_props` | [set_node_props.cypher](../backend/rootcause/graph/queries/set_node_props.cypher) | Merge a map of properties onto nodes by id (agent metrics, Prometheus samples, baselines, rule counters) | - |
 | `set_prediction_props` | [set_prediction_props.cypher](../backend/rootcause/graph/queries/set_prediction_props.cypher) | Store precision/recall on a Prediction after the break | - |
