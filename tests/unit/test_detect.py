@@ -162,3 +162,22 @@ def test_one_failed_request_is_not_an_incident():
     p = {"rps": 0.12, "server_spans": 7, "err_rate": 1 / 7, "bl_err_rate": 0.0}
     assert evaluate("Service", p, c)["error_rate"] is None
     assert evaluate("Service", {**p, "err_rate": 2 / 7}, c)["error_rate"] is not None
+
+
+async def test_baselines_adapt_slowly_after_learning():
+    from rootcause.detect.rules import Detector
+
+    written = {}
+
+    class FakeDB:  # unit stand-in; real graph behaviour is covered in tests/graph
+        async def run(self, name, **kw):
+            if name == "read_detect_inputs":
+                return [{"id": "email", "labels": ["Service"],
+                         "props": {"rps": 1.0, "bl_rps": 1.0, "mem_slope": 20.0, "bl_mem_slope": 0.0}}]
+            if name == "set_node_props":
+                written.update(kw["rows"][0]["props"])
+            return []
+
+    cfg = {**C, "learn_seconds": 0, "ewma_alpha": 0.1, "ewma_alpha_live": 0.01, "hold_ticks": 2, "resolve_ticks": 3}
+    await Detector(FakeDB(), cfg, set()).run(1_000_000, incidents_open=False)
+    assert abs(written["bl_mem_slope"] - 0.2) < 1e-9   # 1 % step towards 20, not 10 %

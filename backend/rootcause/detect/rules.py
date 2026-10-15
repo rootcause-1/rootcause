@@ -195,7 +195,10 @@ class Detector:
                         await self.db.run("resolve_alert", id=alert["id"], target=nid, ts=now_ms)
                         resolved.append({"id": alert["id"], "kind": kind, "target": nid, "ts": now_ms})
             if learning or (not incidents_open and not anomalous):
-                updates.update(update_baselines(label, props, self.c["ewma_alpha"]))
+                # learn fast in the first minutes, then adapt slowly: a fast EWMA would absorb a slow fault
+                # (a memory leak, a creeping slowdown) as "normal" within a minute
+                alpha = self.c["ewma_alpha"] if learning else float(self.c.get("ewma_alpha_live", self.c["ewma_alpha"]))
+                updates.update(update_baselines(label, props, alpha))
             if updates:
                 prop_rows.append({"id": nid, "props": updates})
         if prop_rows:
