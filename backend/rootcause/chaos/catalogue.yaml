@@ -1,0 +1,21 @@
+# Chaos catalogue: flag -> ground truth. Used ONLY by the chaos harness for scoring, never by the engine.
+# VERIFY every `variant` against the flagd JSON and every `truth` by breaking the flag once by hand (CLAUDE.md §12),
+# then write what you observed (which alerts, which nodes) in the comments. A human confirms each entry.
+# `off` is the variant the harness restores between runs (VERIFY it exists for every flag).
+
+- {flag: paymentFailure, variant: "100%", off: "off", truth: payment, class: errors}
+- {flag: paymentUnreachable, variant: "on", off: "off", truth: "edge:checkout->payment", class: errors}
+- {flag: cartFailure, variant: "on", off: "off", truth: cart, class: errors}
+- {flag: adFailure, variant: "on", off: "off", truth: ad, class: errors}
+- {flag: productCatalogFailure, variant: "on", off: "off", truth: product-catalog, class: errors}
+- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}   # VERIFY flag name
+- {flag: imageSlowLoad, variant: "5sec", off: "off", truth: image-provider, class: latency}
+- {flag: intlShippingSlowdown, variant: "on", off: "off", truth: shipping, class: latency}   # VERIFY flag name
+- {flag: adHighCpu, variant: "on", off: "off", truth: ad, class: invisible}
+- {flag: adManualGc, variant: "on", off: "off", truth: ad, class: latency}
+- {flag: emailMemoryLeak, variant: "100x", off: "off", truth: email, class: invisible}
+- {flag: recommendationCacheFailure, variant: "on", off: "off", truth: recommendation, class: invisible}
+- {flag: kafkaQueueProblems, variant: "on", off: "off", truth: "queue:orders", class: invisible}
+- {flag: kafkaConsumerDead, variant: "on", off: "off", truth: accounting, class: invisible}   # VERIFY flag name + which consumer
+- {flag: aiRunawayAgent, variant: "on", off: "off", truth: agent, class: ai}   # VERIFY flag name
+- {flag: aiSlowResponse, variant: "on", off: "off", truth: agent, class: ai}   # VERIFY flag name

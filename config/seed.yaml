@@ -1,0 +1,101 @@
+# Synthetic organisation data for RootCause. All names are invented.
+# Service ids are OpenTelemetry `service.name` values of the demo (VERIFY against Jaeger's service list).
+
+teams:
+  - id: payments-team
+    name: Payments
+    people:
+      - {id: asha-rao, name: Asha Rao, on_call: true, contact: "#payments-oncall"}
+      - {id: tomas-vidal, name: Tomas Vidal, on_call: false, contact: "#payments-oncall"}
+    owns: [payment, checkout, currency, fraud-detection, accounting]
+  - id: storefront-team
+    name: Storefront
+    people:
+      - {id: mei-lin, name: Mei Lin, on_call: true, contact: "#storefront-oncall"}
+      - {id: ravi-kumar, name: Ravi Kumar, on_call: false, contact: "#storefront-oncall"}
+    owns: [frontend, frontend-proxy, cart, ad, recommendation, image-provider, product-reviews]
+  - id: platform-team
+    name: Platform
+    people:
+      - {id: lena-fischer, name: Lena Fischer, on_call: true, contact: "#platform-oncall"}
+      - {id: omar-haddad, name: Omar Haddad, on_call: false, contact: "#platform-oncall"}
+    owns: [shipping, quote, email, kafka]
+  - id: data-team
+    name: Data
+    people:
+      - {id: priya-nair, name: Priya Nair, on_call: true, contact: "#data-oncall"}
+      - {id: jonas-berg, name: Jonas Berg, on_call: false, contact: "#data-oncall"}
+    owns: [product-catalog]
+  - id: ai-team
+    name: AI Assistant
+    people:
+      - {id: sofia-mendes, name: Sofia Mendes, on_call: true, contact: "#ai-oncall"}
+      - {id: kenji-sato, name: Kenji Sato, on_call: false, contact: "#ai-oncall"}
+    owns: [agent]
+
+# Journey ids are prefixed "journey:" so they never collide with service ids (e.g. checkout).
+# Journeys are identified by the route of the root span at the frontend/proxy.
+# `routes` are prefix matches against http.route / url.path. VERIFY routes in Jaeger.
+journeys:
+  - {id: "journey:browse", name: Browse shop, routes: ["/", "/api/products"]}
+  - {id: "journey:view_product", name: View product, routes: ["/product/", "/api/products/", "/api/recommendations", "/api/data"]}
+  - {id: "journey:add_to_cart", name: Add to cart, routes: ["/api/cart", "/cart"]}
+  - {id: "journey:checkout", name: Checkout, routes: ["/api/checkout", "/checkout"]}
+  - {id: "journey:ask_assistant", name: Ask assistant, routes: ["/chatbot", "/api/chat", "/prompt"]}
+
+runbooks:
+  - {id: rb-payment, service: payment, title: "Payment errors", url: "runbooks/payment.md",
+     steps: ["Check recent flag changes on payment", "Revert the flag", "Restart payment if errors persist"],
+     remediates: ["payment:error_rate"]}
+  - {id: rb-checkout, service: checkout, title: "Checkout failing or slow", url: "runbooks/checkout.md",
+     steps: ["Check downstream calls (payment, cart, shipping)", "Check checkout -> payment connectivity"],
+     remediates: ["checkout:error_rate", "checkout:latency"]}
+  - {id: rb-cart, service: cart, title: "Cart errors", url: "runbooks/cart.md",
+     steps: ["Check valkey-cart", "Revert recent cart flags", "Restart cart (sessions held in valkey survive)"],
+     remediates: ["cart:error_rate"]}
+  - {id: rb-ad, service: ad, title: "Ad service errors / CPU / GC", url: "runbooks/ad.md",
+     steps: ["Check ad CPU and GC", "Revert ad flags", "Restart ad"],
+     remediates: ["ad:error_rate", "ad:cpu", "ad:latency"]}
+  - {id: rb-product-catalog, service: product-catalog, title: "Catalog errors or lock contention", url: "runbooks/product-catalog.md",
+     steps: ["Check catalog errors per product", "Revert catalog flags"],
+     remediates: ["product-catalog:error_rate", "product-catalog:latency"]}
+  - {id: rb-image, service: image-provider, title: "Slow images", url: "runbooks/image-provider.md",
+     steps: ["Check image-provider latency", "Revert image flags"], remediates: ["image-provider:latency"]}
+  - {id: rb-shipping, service: shipping, title: "Shipping slow", url: "runbooks/shipping.md",
+     steps: ["Check quote latency", "Revert shipping flags"], remediates: ["shipping:latency"]}
+  - {id: rb-email, service: email, title: "Email memory growth", url: "runbooks/email.md",
+     steps: ["Watch memory slope", "Revert memory-leak flags", "Restart email"], remediates: ["email:memory"]}
+  - {id: rb-recommendation, service: recommendation, title: "Recommendation cache failure", url: "runbooks/recommendation.md",
+     steps: ["Check recommendation memory and latency", "Revert cache flags"],
+     remediates: ["recommendation:latency", "recommendation:memory"]}
+  - {id: rb-kafka, service: kafka, title: "Kafka lag / dead consumer", url: "runbooks/kafka.md",
+     steps: ["Check consumer group lag", "Restart the lagging consumer", "Revert kafka flags"],
+     remediates: ["queue:orders:lag"]}
+  - {id: rb-agent, service: agent, title: "Assistant runaway or slow", url: "runbooks/agent.md",
+     steps: ["Check tool calls per run and LLM latency", "Revert AI flags"],
+     remediates: ["agent:agent_loop", "agent:llm_latency"]}
+  - {id: rb-frontend, service: frontend, title: "Frontend errors", url: "runbooks/frontend.md",
+     steps: ["Follow the evidence path to the deepest failing dependency"], remediates: ["frontend:error_rate"]}
+
+# Fallback (:FeatureFlag)-[:AFFECTS]->(:Service) map, used only if flag evaluations do not show up
+# on spans (CLAUDE.md §5). This is the flag's *blast area* as documented by the demo, not a diagnosis:
+# the engine still has to find which affected node is actually broken.
+flag_service_map:
+  paymentFailure: [payment]
+  paymentUnreachable: [checkout, payment]
+  cartFailure: [cart]
+  adFailure: [ad]
+  adHighCpu: [ad]
+  adManualGc: [ad]
+  productCatalogFailure: [product-catalog]
+  productCatalogLockContention: [product-catalog]
+  imageSlowLoad: [image-provider, frontend]
+  intlShippingSlowdown: [shipping]
+  emailMemoryLeak: [email]
+  recommendationCacheFailure: [recommendation]
+  kafkaQueueProblems: [kafka, checkout, accounting, fraud-detection]
+  kafkaConsumerDead: [accounting, fraud-detection]
+  aiRunawayAgent: [agent]
+  aiSlowResponse: [agent]
+  loadGeneratorFloodHomepage: [load-generator]
+  failedReadinessProbe: [cart]

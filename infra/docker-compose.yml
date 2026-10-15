@@ -1,0 +1,59 @@
+# RootCause stack for live mode. Joins the OpenTelemetry Demo's network so the collector can reach rootcause-api.
+# Run from the repo root: `make up` (needs `make demo-up` first).
+name: rootcause
+
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6380:6379"   # Redis protocol (host 6380 avoids clashes)
+      - "3300:3000"   # FalkorDB Browser
+    volumes:
+      - falkordb-data:/var/lib/falkordb/data
+    networks: [demo]
+
+  rootcause-api:
+    build: {context: .., dockerfile: infra/Dockerfile.api}
+    env_file: ../.env
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      FLAGD_CONFIG_PATH: /flagd/demo.flagd.json     # VERIFY file name inside the mounted dir
+      RC_API_URL: http://rootcause-api:8000
+      RC_MCP_URL: http://rootcause-mcp:8811/mcp
+    ports: ["8000:8000"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DEMO_REPO_ABS:-../../opentelemetry-demo}/src/flagd:/flagd   # dir mount so os.replace works; paths here are relative to infra/
+      - ../data:/app/data
+      - ../reports:/app/reports
+      - ../replay:/app/replay
+      - ../docs:/app/docs
+    depends_on: [falkordb]
+    networks: [demo]
+
+  rootcause-mcp:
+    build: {context: .., dockerfile: infra/Dockerfile.api}
+    command: ["python", "-m", "rootcause.mcp_server", "--http", "--port", "8811"]
+    env_file: ../.env
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      RC_API_URL: http://rootcause-api:8000
+    ports: ["8811:8811"]
+    depends_on: [falkordb, rootcause-api]
+    networks: [demo]
+
+  rootcause-ui:
+    build: {context: .., dockerfile: infra/Dockerfile.ui}
+    ports: ["8088:8088"]
+    depends_on: [rootcause-api]
+    networks: [demo]
+
+volumes:
+  falkordb-data:
+
+networks:
+  demo:
+    name: ${DEMO_NETWORK:-opentelemetry-demo}   # VERIFY with `docker network ls`
+    external: true

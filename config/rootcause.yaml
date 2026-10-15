@@ -1,0 +1,96 @@
+# RootCause runtime configuration.
+# Anything marked VERIFY must be checked against the running OpenTelemetry Demo (CLAUDE.md §5)
+# and the real value written here. `null` means "not verified yet" — the code skips that input
+# and logs a warning instead of guessing.
+
+demo:
+  compose_project: opentelemetry-demo        # VERIFY: docker compose project / network name
+  network: opentelemetry-demo                # VERIFY
+  collector_exporter_type: otlp_http         # VERIFY: otlp_http vs otlphttp (check collector logs)
+  collector_json_encoding: null              # VERIFY: true once `encoding: json` is confirmed
+  agent_prompt_url: null                     # VERIFY: e.g. http://localhost:8080/<agent>/prompt (read compose.agent.yaml)
+  agent_service: agent                       # VERIFY: service.name of the agent's spans
+  agent_workflow_span: astronomy_shop_agent_workflow
+  flagd_hot_reload: null                     # VERIFY: true once a hand edit changes the shop
+  flag_eval_attribute: null                  # VERIFY: e.g. feature_flag.key if flag evaluations appear on spans
+
+ingest:
+  window_seconds: 60
+  finalise_lag_ticks: 2                      # traces younger than this many ticks are not aggregated yet
+  journey_root_services: [frontend-proxy, frontend]
+  journey_critical_share: 0.9                # REQUIRES.critical when a service is in >= 90% of a journey's traces
+  # map rpc.service / server.address values to service.name when no server span answers
+  peer_aliases:
+    oteldemo.PaymentService: payment
+    oteldemo.CartService: cart
+    oteldemo.CheckoutService: checkout
+    oteldemo.CurrencyService: currency
+    oteldemo.EmailService: email
+    oteldemo.ProductCatalogService: product-catalog
+    oteldemo.RecommendationService: recommendation
+    oteldemo.ShippingService: shipping
+    oteldemo.AdService: ad
+    oteldemo.QuoteService: quote
+  cache_systems: [redis, valkey]
+
+prometheus:
+  url: http://prometheus:9090                # VERIFY (overridden by PROMETHEUS_URL)
+  # Filled by scripts/discover_metrics.py, then confirmed by a human. Each entry:
+  #   promql: the query; label: which series label names the target; target_prefix: node id prefix;
+  #   prop: the property written on the node.
+  queries:
+    kafka_lag: null                          # VERIFY e.g. {promql: 'sum by (topic) (kafka_consumergroup_lag)', label: topic, target_prefix: 'queue:', prop: lag}
+    runtime_memory: null                     # VERIFY e.g. {promql: 'sum by (service_name) (process_memory_usage)', label: service_name, target_prefix: '', prop: runtime_mem_mb, scale: 1.0e-6}
+
+docker:
+  enabled: true
+  stats_parallelism: 8
+  mem_slope_window_s: 120
+
+flagd:
+  poll_seconds: 2
+  path: null                                 # VERIFY (overridden by FLAGD_CONFIG_PATH)
+
+detect:
+  learn_seconds: 180
+  ewma_alpha: 0.1
+  hold_ticks: 2                              # a rule must hold this many consecutive ticks
+  resolve_ticks: 3                           # healthy ticks before an alert resolves
+  min_rps: 0.05                              # ignore error/latency rules on nodes with less traffic
+  error_sigma: 3.0
+  error_floor: 0.05
+  latency_factor: 2.0
+  latency_min_ms: 50
+  lag_consume_ratio: 0.2
+  mem_slope_mb_per_min: 5
+  cpu_pct: 85
+  agent_loop_factor: 3.0
+  llm_latency_factor: 2.0
+
+engine:
+  agent_delay_seconds: 15                    # let an incident gather alerts before investigating
+  recover_ticks: 3                           # incident auto-resolves after this many ticks with no anomalous members
+  weights:
+    depth: 0.30
+    self: 0.25
+    pagerank: 0.20
+    change: 0.15
+    memory: 0.10
+  change_strong_min: 10
+  change_weak_min: 30
+  strong_memory: 0.6
+  evidence_max_hops: 8
+
+safety:
+  stateful_datastores: [cache:valkey-cart]
+  high_betweenness_percentile: 0.8
+
+agent:
+  max_tool_calls: 12
+  budget_seconds: 90
+
+verify:
+  timeout_seconds: 90
+
+# never candidates for root cause, never alerted on
+non_candidates: [load-generator, flagd, flagd-ui, otel-collector, otelcol, rootcause-api, rootcause-mcp, rootcause-ui, jaeger, prometheus, grafana, opensearch]

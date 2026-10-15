@@ -1,0 +1,48 @@
+[project]
+name = "rootcause"
+version = "0.1.0"
+description = "AI on-call agent: OpenTelemetry traces -> FalkorDB graph -> root cause, fix, verify, remember."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "httpx>=0.27",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "pyyaml>=6",
+  "falkordb>=1.0.10",
+  "mcp>=1.9,<2",
+  "anthropic>=0.40",
+  "docker>=7",
+  "opentelemetry-proto>=1.24",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5", "testcontainers>=4"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/rootcause"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+markers = [
+  "graph: needs a FalkorDB test container",
+  "scenario: golden replay tests (needs recordings + FalkorDB)",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["backend", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "B008"]

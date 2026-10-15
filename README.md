@@ -1,0 +1,117 @@
+# RootCause
+
+An AI on-call agent for the OpenTelemetry Demo shop. It turns live traces and metrics into a **FalkorDB** graph,
+finds the one real cause behind a storm of symptom alerts, proves it with an evidence path, fixes it with human
+approval, verifies recovery, writes the report and remembers the incident.
+
+**Track:** Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB) — *Agents That Act on Connected Data*
+**Demo video:** _TODO link_ · **Live (replay) deployment:** _TODO link_
+
+Architecture diagram and how each part works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+> Status: all milestones are coded, but none of the acceptance checks has run yet (no Docker on the first dev
+> machine). See [docs/PROGRESS.md](docs/PROGRESS.md).
+
+## Why a graph
+Many alerts → one incident is a **connected-components** question (`algo.WCC` over BLAMES). "Who is to blame" is
+**PageRank** over BLAMES plus depth. "What else breaks" is **BFS** upstream over CALLED_BY. "How risky is a restart" is
+**betweenness**. "Have we seen this before" is **Jaccard** over shared SignalPatterns. Remove FalkorDB and none of
+these work — the graph is the engine's state, not a cache.
+
+## Quick start — live mode (needs Docker, ~8 GB RAM)
+```bash
+cp .env.example .env            # add ANTHROPIC_API_KEY to use the LLM agent (optional)
+make demo-up                    # clones the OpenTelemetry Demo to ../opentelemetry-demo, installs our collector override, starts agentic mode
+make up                         # FalkorDB (:6380, browser :3300), API (:8000, OTLP :4318), MCP (:8811), UI (:8088)
+make seed                       # indexes + teams, people, journeys, runbooks
+open http://localhost:8088      # wait ~3 min while baselines are learned
+```
+Then go to **Chaos lab → Break it**. Before the first run, work through the VERIFY list in
+[docs/PROGRESS.md](docs/PROGRESS.md) and record real values in `config/rootcause.yaml`.
+
+Development without containers for the API: `uv sync && PYTHONPATH=backend uv run python -m rootcause.api` with
+`FALKORDB_HOST=localhost FALKORDB_PORT=6380`; UI: `make ui` (Vite on :5173, proxies `/api` to :8000).
+
+## Quick start — replay mode (no demo needed)
+```bash
+make replay-up                  # FalkorDB + API (RC_MODE=replay) + UI on :8088
+open http://localhost:8088      # pick a recorded scenario; actions are simulated
+```
+Recordings live in `replay/*.jsonl.gz` and are made from the live demo with `make record SCENARIO=paymentFailure`.
+
+## Graph data model
+Full tables: [docs/GRAPH_MODEL.md](docs/GRAPH_MODEL.md).
+
+```mermaid
+graph LR
+  Journey -- REQUIRES --> Service
+  Service -- CALLS / CALLED_BY --> Service
+  Service -- PRODUCES_TO --> Queue -- CONSUMED_BY --> Service
+  Service -- USES --> Datastore
+  Service -- RUNS_IN --> Container
+  Team -- OWNS --> Service
+  FeatureFlag -- AFFECTS --> Service
+  Change -- CHANGED --> FeatureFlag
+  Alert -- FIRED_ON --> Service
+  Alert -- PART_OF --> Incident
+  Incident -- ROOT_CAUSE --> Service
+  Incident -- CAUSED_BY --> Change
+  Incident -- IMPACTED --> Journey
+  Incident -- SIMILAR_TO --> Incident
+  Incident -- INVESTIGATED_BY --> Step -- CITED --> Service
+```
+
+| Nodes | Service, Queue, Datastore, Container, Journey, Team, Person, Runbook, FeatureFlag, Change, Alert, Incident, SignalPattern, Hypothesis, Action, Prediction, Step, Report, ChaosRun (+ dynamic `:Anomalous`) |
+|---|---|
+| **Edges** | CALLS, CALLED_BY, PRODUCES_TO, CONSUMED_BY, USES, RUNS_IN, REQUIRES, OWNS, MEMBER_OF, FOR, REMEDIATES, AFFECTS, CHANGED, FIRED_ON, PART_OF, BLAMES (transient), ROOT_CAUSE, CAUSED_BY, IMPACTED, RESOLVED_BY, HAS_SIGNAL, SIMILAR_TO, HAS_REPORT, HAS_HYPOTHESIS, INVESTIGATED_BY, NEXT, CITED, PREDICTS, PRODUCED |
+
+## Queries and algorithms we depend on
+All 73 queries are named `.cypher` files in [backend/rootcause/graph/queries/](backend/rootcause/graph/queries/), listed
+with their purpose in [docs/QUERIES.md](docs/QUERIES.md). The core ones:
+
+| Query | Algorithm | Purpose |
+|---|---|---|
+| [rebuild_blames](backend/rootcause/graph/queries/rebuild_blames.cypher) | – | BLAMES between anomalous nodes |
+| [group_incidents](backend/rootcause/graph/queries/group_incidents.cypher) | `algo.WCC` | many alerts → one incident |
+| [pagerank_blame](backend/rootcause/graph/queries/pagerank_blame.cypher) | `algo.pageRank` | where blame flows |
+| [evidence_path](backend/rootcause/graph/queries/evidence_path.cypher) | `shortestPath` | the evidence chain |
+| [upstream_bfs](backend/rootcause/graph/queries/upstream_bfs.cypher) | `algo.bfs` | blast radius, prediction |
+| [service_betweenness](backend/rootcause/graph/queries/service_betweenness.cypher) | `algo.betweenness` | restart risk |
+| [similar_incidents](backend/rootcause/graph/queries/similar_incidents.cypher) | Jaccard over HAS_SIGNAL | incident memory |
+| [recent_changes_for](backend/rootcause/graph/queries/recent_changes_for.cypher) | – | flag changes that AFFECT a node |
+
+## Scorecard
+Generated from blind chaos runs by `make chaos N=15`: [docs/SCORECARD.md](docs/SCORECARD.md). _No runs yet._
+
+## Use it from Claude Desktop (MCP)
+With `make up` running, add to `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "rootcause": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/rootcause", "python", "-m", "rootcause.mcp_server"],
+      "env": {"PYTHONPATH": "backend", "FALKORDB_HOST": "localhost", "FALKORDB_PORT": "6380",
+              "RC_API_URL": "http://localhost:8000"}
+    }
+  }
+}
+```
+Ask: *"Who owns payment?"*, *"What's the root cause of the open incident?"*. Tools: `list_incidents`,
+`get_incident`, `rank_root_causes`, `trace_evidence_path`, `what_changed`, `measure_impact`, `blast_radius`,
+`predict_failure`, `find_similar_incidents`, `who_owns`, `get_runbook`, `cypher_readonly`, `propose_action`,
+`execute_action` (needs a human-minted approval token), `verify_recovery`, `write_report`.
+
+## Tests
+`make lint test` (unit + graph tests; graph tests start a FalkorDB test container and skip without Docker),
+`make scenario-test` (golden replays: top-1 must equal the catalogue truth).
+
+## Data statement
+Only telemetry generated by the OpenTelemetry Demo on our own machines, plus the synthetic seed file
+(`config/seed.yaml`: invented teams, people and runbooks). No private or scraped data.
+
+## AI disclosure
+Built with Claude Code; see [docs/AI_DISCLOSURE.md](docs/AI_DISCLOSURE.md).
+
+## Team
+_TODO: names and who owns what (ingest/engine, agent/MCP, UI, eval/replay)._

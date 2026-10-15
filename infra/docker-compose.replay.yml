@@ -1,0 +1,24 @@
+# Public deployment: FalkorDB + API in replay mode + UI behind one port (8088). No OpenTelemetry Demo needed.
+# Fresh VM: `docker compose -f infra/docker-compose.replay.yml up -d --build` -> http://<host>:8088
+name: rootcause-replay
+
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+
+  rootcause-api:
+    build: {context: .., dockerfile: infra/Dockerfile.api}
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      RC_MODE: replay
+      RC_GRAPH: rc_replay
+      RC_AGENT_MODE: autopilot
+      RC_REPLAY_SCENARIO: ${RC_REPLAY_SCENARIO:-paymentFailure}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on: [falkordb]
+
+  rootcause-ui:
+    build: {context: .., dockerfile: infra/Dockerfile.ui}
+    ports: ["8088:8088"]
+    depends_on: [rootcause-api]

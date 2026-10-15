@@ -1,0 +1,12 @@
+# Copied to <demo>/src/otel-collector/otelcol-config-extras.yml by scripts/setup_demo.sh.
+# The collector merges this file LAST. Keep span_metrics in the traces exporters or the collector crashes.
+exporters:
+  otlp_http/rootcause:                       # VERIFY: exporter type name (otlp_http vs otlphttp) in collector logs
+    endpoint: http://rootcause-api:4318      # collector appends /v1/traces
+    encoding: json                           # VERIFY: supported by this collector version (API also accepts protobuf)
+    tls:
+      insecure: true
+service:
+  pipelines:
+    traces:
+      exporters: [debug, otlp_grpc/jaeger, span_metrics, otlp_http/rootcause]

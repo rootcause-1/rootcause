@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/actioncard.tsx","./src/components/graphview.tsx","./src/components/incidentpanel.tsx","./src/components/traildrawer.tsx","./src/tabs/chaoslab.tsx","./src/tabs/memory.tsx","./src/tabs/predict.tsx","./src/tabs/reports.tsx"],"version":"5.6.3"}

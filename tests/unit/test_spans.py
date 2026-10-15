@@ -1,0 +1,133 @@
+"""Span pairing, unanswered calls, self-error attribution, messaging, datastores, journeys, agent runs."""
+
+from rootcause.ingest.otlp import CLIENT, CONSUMER, INTERNAL, PRODUCER, SERVER, Span, parse_otlp_json
+from rootcause.ingest.spans import IngestConfig, SpanWindow, aggregate_traces, match_journey
+
+CFG = IngestConfig(
+    window_ms=60_000, finalise_lag_ms=0,
+    peer_aliases={"oteldemo.PaymentService": "payment"},
+    journeys=[{"id": "journey:checkout", "routes": ["/api/checkout"]}, {"id": "journey:browse", "routes": ["/"]}],
+)
+
+
+def sp(tid, sid, parent, svc, kind, err=False, t=1000, dur=10, name="op", **attrs):
+    return Span(tid, sid, parent, svc, name, kind, t, t + dur, err, attrs)
+
+
+def run(spans, cfg=CFG):
+    traces = {}
+    for s in spans:
+        traces.setdefault(s.trace_id, []).append(s)
+    return aggregate_traces(traces, 0, 60_000, cfg)
+
+
+def test_client_server_pairing_makes_call_edge():
+    st = run([
+        sp("t", "1", "", "frontend", SERVER),
+        sp("t", "2", "1", "frontend", CLIENT, **{"rpc.system": "grpc"}),
+        sp("t", "3", "2", "checkout", SERVER),
+    ])
+    calls = {(c["src"], c["dst"]): c for c in st.calls}
+    assert ("frontend", "checkout") in calls
+    assert calls[("frontend", "checkout")]["protocol"] == "grpc"
+    assert calls[("frontend", "checkout")]["unanswered_rate"] == 0
+
+
+def test_unanswered_call_named_via_rpc_alias():
+    st = run([
+        sp("t", "1", "", "checkout", SERVER, err=True),
+        sp("t", "2", "1", "checkout", CLIENT, err=True, **{"rpc.service": "oteldemo.PaymentService",
+                                                              "server.address": "badAddress"}),
+    ])
+    c = st.calls[0]
+    assert (c["src"], c["dst"]) == ("checkout", "payment")
+    assert c["unanswered_rate"] > 0 and c["err_rate"] == 1.0
+
+
+def test_self_error_only_where_error_originates():
+    st = run([
+        sp("t", "1", "", "frontend", SERVER, err=True),
+        sp("t", "2", "1", "frontend", CLIENT, err=True),
+        sp("t", "3", "2", "payment", SERVER, err=True),  # no erroring children -> self error
+    ])
+    svc = {s["id"]: s for s in st.services}
+    assert svc["payment"]["self_err_rate"] == 1.0
+    assert svc["frontend"]["self_err_rate"] == 0.0
+    assert svc["frontend"]["err_rate"] == 1.0
+
+
+def test_internal_child_error_moves_self_error_down():
+    st = run([
+        sp("t", "1", "", "payment", SERVER, err=True),
+        sp("t", "2", "1", "payment", INTERNAL, err=True),
+    ])
+    # the internal span is the origin; the server span has an erroring child
+    assert st.services[0]["self_err_rate"] == 1.0  # 1 self error / 1 server span
+
+
+def test_messaging_and_db():
+    st = run([
+        sp("t", "1", "", "checkout", PRODUCER, **{"messaging.destination.name": "orders"}),
+        sp("t", "2", "1", "accounting", CONSUMER, **{"messaging.destination.name": "orders",
+                                                     "messaging.consumer.group.name": "accounting"}),
+        sp("u", "1", "", "cart", CLIENT, **{"db.system": "redis", "server.address": "valkey-cart"}),
+    ])
+    assert st.produces[0]["queue"] == "queue:orders"
+    assert st.consumes[0]["svc"] == "accounting" and st.consumes[0]["group"] == "accounting"
+    assert st.uses[0]["ds"] == "cache:valkey-cart"
+    assert st.queues[0]["produce_rate"] > 0 and st.queues[0]["consume_rate"] > 0
+
+
+def test_journey_success_and_requires():
+    st = run([
+        sp("t", "1", "", "frontend-proxy", SERVER, **{"http.route": "/api/checkout",
+                                                      "http.response.status_code": 500}),
+        sp("t", "2", "1", "checkout", SERVER),
+        sp("u", "1", "", "frontend-proxy", SERVER, **{"url.path": "/api/checkout"}),
+    ])
+    j = st.journeys[0]
+    assert j["id"] == "journey:checkout" and j["success_rate"] == 0.5
+    req = {r["svc"]: r for r in st.requires}
+    assert req["frontend-proxy"]["critical"] is True
+    assert req["checkout"]["share"] == 0.5
+
+
+def test_match_journey_root_is_exact():
+    js = [{"id": "browse", "routes": ["/"]}, {"id": "view", "routes": ["/product/"]}]
+    assert match_journey("/", js) == "browse"
+    assert match_journey("/product/123", js) == "view"
+    assert match_journey("/other", js) is None
+
+
+def test_agent_run_counts_tools():
+    st = run([
+        sp("t", "1", "", "agent", SERVER, name="astronomy_shop_agent_workflow"),
+        sp("t", "2", "1", "agent", INTERNAL, name="execute_tool search"),
+        sp("t", "3", "1", "agent", INTERNAL, **{"gen_ai.operation.name": "execute_tool"}),
+        sp("t", "4", "1", "agent", CLIENT, dur=900, **{"gen_ai.operation.name": "chat"}),
+    ])
+    props = st.agent_props[0]["props"]
+    assert props["tool_calls_per_run"] == 2 and props["llm_p95_ms"] == 900
+
+
+def test_window_waits_for_finalise_lag_and_prunes():
+    w = SpanWindow(IngestConfig(window_ms=60_000, finalise_lag_ms=10_000))
+    w.add([sp("t", "1", "", "frontend", SERVER, t=100_000)])
+    assert w.aggregate(105_000).services == []  # too fresh
+    assert w.aggregate(115_000).services[0]["id"] == "frontend"
+    w.aggregate(500_000)
+    assert not w.traces
+
+
+def test_parse_otlp_json_with_string_enums_and_offset():
+    doc = {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "cart"}}]},
+                              "scopeSpans": [{"spans": [{
+                                  "traceId": "ab", "spanId": "cd", "name": "GetCart", "kind": "SPAN_KIND_SERVER",
+                                  "startTimeUnixNano": "1700000000000000000", "endTimeUnixNano": "1700000000050000000",
+                                  "status": {"code": "STATUS_CODE_ERROR"},
+                                  "attributes": [{"key": "rpc.system", "value": {"stringValue": "grpc"}},
+                                                 {"key": "n", "value": {"intValue": "3"}}]}]}]}]}
+    [s] = parse_otlp_json(doc, offset_ms=5)
+    assert s.service == "cart" and s.kind == SERVER and s.error
+    assert s.duration_ms == 50 and s.start_ms == 1_700_000_000_000 + 5
+    assert s.attrs["n"] == 3

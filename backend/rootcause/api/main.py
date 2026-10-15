@@ -1,0 +1,288 @@
+"""FastAPI app: OTLP receiver (`POST /v1/traces`), the UI API (`/api/*`) and the SSE stream.
+
+Startup: connect to FalkorDB, create indexes, seed the graph if it has no teams, build the Runtime, then start the
+tick loop plus live sources (live mode) or the replay player (replay mode).
+Queries used directly: graph_nodes/graph_edges (via runtime), list_reports, memory_incidents, get_prediction.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
+
+from rootcause import facts
+from rootcause.actions import pager
+from rootcause.chaos.runner import ChaosRunner, load_catalogue
+from rootcause.engine import predict
+from rootcause.graph.client import get_graph
+from rootcause.graph.schema import ensure_indexes, load_seed
+from rootcause.ingest.otlp import parse_body
+from rootcause.ingest.tick import Runtime
+from rootcause.replay.player import Player, list_scenarios
+from rootcause.replay.recorder import Recorder
+from rootcause.settings import get_settings
+from rootcause.util import now_ms
+
+log = logging.getLogger("rootcause.api")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
+class State:
+    rt: Runtime
+    chaos: ChaosRunner
+    recorder: Recorder
+    player_task: asyncio.Task[Any] | None = None
+
+
+S = State()
+
+
+async def _start_replay(name: str) -> dict[str, Any]:
+    s = get_settings()
+    path = f"{s.rc_replay_dir}/{name}.jsonl.gz"
+    if S.player_task and not S.player_task.done():
+        S.player_task.cancel()
+    await S.rt.db.delete()  # a fresh rc_replay graph per scenario
+    await ensure_indexes(S.rt.db)
+    await load_seed(S.rt.db)
+    S.rt.detector.started_ms = None
+    S.rt.started.clear()
+    S.rt.player = Player(path, S.rt.pipeline.feed)
+    S.player_task = asyncio.ensure_future(S.rt.player.run())
+    return S.rt.player.status()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    s = get_settings()
+    db = get_graph()
+    await ensure_indexes(db)
+    if not await db.raw("MATCH (t:Team) RETURN t.id AS id LIMIT 1", read_only=True):
+        log.info("seeding %s: %s", db.name, await load_seed(db))
+    S.recorder = Recorder(s.rc_replay_dir)
+    S.rt = Runtime(s, db, recorder=S.recorder if s.rc_mode == "live" else None)
+    S.chaos = ChaosRunner(S.rt)
+    S.rt.tasks.append(asyncio.ensure_future(S.rt.run_ticks()))
+    if s.rc_mode == "live":
+        await S.rt.start_live_sources()
+    elif s.rc_replay_scenario in list_scenarios(s.rc_replay_dir):
+        await _start_replay(s.rc_replay_scenario)
+    elif s.rc_replay_scenario:
+        log.warning("replay scenario %s not found in %s; pick one in the UI", s.rc_replay_scenario, s.rc_replay_dir)
+    log.info("RootCause up: mode=%s graph=%s agent=%s", s.rc_mode, db.name, s.rc_agent_mode)
+    yield
+    await S.rt.stop()
+    S.recorder.stop()
+
+
+app = FastAPI(title="RootCause", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+# --------------------------------------------------------------------------- OTLP
+@app.post("/v1/traces")
+async def otlp_traces(request: Request) -> JSONResponse:
+    body = await request.body()
+    try:
+        doc = parse_body(body, request.headers.get("content-type", ""))
+    except Exception as exc:
+        raise HTTPException(400, f"bad OTLP body: {exc}") from exc
+    await S.rt.pipeline.feed({"type": "otlp", "ts": now_ms(), "data": doc})
+    return JSONResponse({"partialSuccess": {}})
+
+
+# --------------------------------------------------------------------------- status / graph
+@app.get("/api/status")
+async def status() -> dict[str, Any]:
+    return S.rt.status() | {"recording": S.recorder.scenario if S.recorder.active else None,
+                            "chaos": S.chaos.state}
+
+
+@app.get("/api/graph")
+async def graph() -> dict[str, Any]:
+    return await S.rt.graph_snapshot()
+
+
+@app.get("/api/stream")
+async def stream() -> StreamingResponse:
+    return StreamingResponse(S.rt.sse.stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# --------------------------------------------------------------------------- incidents
+@app.get("/api/incidents")
+async def incidents(status: str = "all") -> list[dict[str, Any]]:
+    return await facts.list_incidents(S.rt.db, status)
+
+
+@app.get("/api/incidents/{incident_id}")
+async def incident(incident_id: str) -> dict[str, Any]:
+    inc = await facts.full(S.rt.db, incident_id)
+    if inc is None:
+        raise HTTPException(404, "no such incident")
+    root = inc.get("root_target")
+    inc["evidence_path"] = (await S.rt.tools.incident_evidence_path(incident_id))["path"] if root else []
+    inc["similar"] = (await S.rt.tools.find_similar_incidents(incident_id))["similar"]
+    return inc
+
+
+@app.post("/api/incidents/{incident_id}/investigate")
+async def investigate(incident_id: str) -> dict[str, Any]:
+    return await S.rt.investigate(incident_id)
+
+
+@app.post("/api/incidents/{incident_id}/propose")
+async def propose(incident_id: str) -> dict[str, Any]:
+    return await S.rt.actions.propose(incident_id)
+
+
+@app.post("/api/incidents/{incident_id}/verify")
+async def verify(incident_id: str) -> dict[str, Any]:
+    return await S.rt.actions.verify_recovery(incident_id)
+
+
+@app.post("/api/incidents/{incident_id}/report")
+async def report(incident_id: str) -> dict[str, Any]:
+    return await S.rt.actions.write_report(incident_id)
+
+
+# --------------------------------------------------------------------------- actions
+class Approve(BaseModel):
+    confirm: str | None = None
+    execute: bool = True
+
+
+class Execute(BaseModel):
+    approval_token: str
+
+
+@app.post("/api/actions/{action_id}/approve")
+async def approve(action_id: str, body: Approve | None = None) -> dict[str, Any]:
+    """Mints the single-use approval token. The UI approves and executes in one click (execute=true)."""
+    body = body or Approve()
+    out = await S.rt.actions.approve(action_id, body.confirm)
+    if "error" in out:
+        raise HTTPException(400, out["error"])
+    if body.execute:
+        result = await S.rt.actions.execute(action_id, out["approval_token"])
+        return {"action": action_id, "approved": True, "execution": result}
+    return out
+
+
+@app.post("/api/actions/{action_id}/reject")
+async def reject(action_id: str) -> dict[str, Any]:
+    return await S.rt.actions.reject(action_id)
+
+
+@app.post("/api/actions/{action_id}/execute")
+async def execute(action_id: str, body: Execute) -> dict[str, Any]:
+    return await S.rt.actions.execute(action_id, body.approval_token)
+
+
+@app.get("/api/pager")
+async def pager_inbox() -> list[dict[str, Any]]:
+    return pager.read_inbox(get_settings().rc_data_dir)
+
+
+# --------------------------------------------------------------------------- predict / memory / reports
+class PredictReq(BaseModel):
+    node_id: str
+
+
+@app.post("/api/predict")
+async def predict_route(body: PredictReq) -> dict[str, Any]:
+    return await predict.predict(S.rt.db, body.node_id)
+
+
+@app.post("/api/predictions/{prediction_id}/score")
+async def score_prediction(prediction_id: str) -> dict[str, Any]:
+    return await predict.score(S.rt.db, prediction_id)
+
+
+@app.get("/api/memory")
+async def memory_tab() -> list[dict[str, Any]]:
+    return await S.rt.db.run("memory_incidents")
+
+
+@app.get("/api/reports")
+async def reports() -> list[dict[str, Any]]:
+    return await S.rt.db.run("list_reports")
+
+
+# --------------------------------------------------------------------------- chaos
+class ChaosReq(BaseModel):
+    n: int = 1
+    seed: int | None = None
+    flag: str | None = None
+    mystery: bool = False
+
+
+@app.get("/api/chaos/catalogue")
+async def chaos_catalogue() -> list[dict[str, Any]]:
+    # the UI only needs flag names and classes; truth stays server-side until a run is scored
+    return [{"flag": e["flag"], "class": e.get("class")} for e in load_catalogue()]
+
+
+@app.post("/api/chaos/run")
+async def chaos_run(body: ChaosReq) -> dict[str, Any]:
+    if get_settings().rc_mode != "live":
+        raise HTTPException(400, "chaos runs need live mode (the real demo)")
+    if S.chaos.state.get("running"):
+        raise HTTPException(409, "a chaos batch is already running")
+    seed = body.seed if body.seed is not None else now_ms() % 100000
+    S.rt.tasks.append(asyncio.ensure_future(S.chaos.run_batch(body.n, seed, body.flag, body.mystery)))
+    return {"started": True, "n": body.n, "seed": seed}
+
+
+@app.get("/api/chaos/status")
+async def chaos_status() -> dict[str, Any]:
+    return S.chaos.state
+
+
+# --------------------------------------------------------------------------- record / replay
+class RecordReq(BaseModel):
+    scenario: str
+
+
+class MarkerReq(BaseModel):
+    name: str
+    data: dict[str, Any] = {}
+
+
+@app.post("/api/record/start")
+async def record_start(body: RecordReq) -> dict[str, Any]:
+    return {"path": S.recorder.start(body.scenario, {"scenario": body.scenario})}
+
+
+@app.post("/api/record/marker")
+async def record_marker(body: MarkerReq) -> dict[str, Any]:
+    S.recorder.marker(body.name, body.data)
+    return {"ok": True, "events": S.recorder.events}
+
+
+@app.post("/api/record/stop")
+async def record_stop() -> dict[str, Any]:
+    events = S.recorder.events
+    S.recorder.stop()
+    return {"ok": True, "events": events}
+
+
+@app.get("/api/replay/scenarios")
+async def replay_scenarios() -> list[str]:
+    return list_scenarios(get_settings().rc_replay_dir)
+
+
+@app.post("/api/replay/start")
+async def replay_start(body: RecordReq) -> dict[str, Any]:
+    if get_settings().rc_mode != "replay":
+        raise HTTPException(400, "replay needs RC_MODE=replay")
+    if body.scenario not in list_scenarios(get_settings().rc_replay_dir):
+        raise HTTPException(404, "unknown scenario")
+    return await _start_replay(body.scenario)
