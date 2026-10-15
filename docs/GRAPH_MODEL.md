@@ -78,7 +78,7 @@ removed by `resolve_alert` when no firing alert remains).
 | `(Journey)-[:REQUIRES]->(Service)` | share, critical | services seen in a journey's traces |
 | `(Team)-[:OWNS]->(Service)`, `(Person)-[:MEMBER_OF]->(Team)` | | seed |
 | `(Runbook)-[:FOR]->(Service)`, `(Runbook)-[:REMEDIATES]->(SignalPattern)` | | seed |
-| `(FeatureFlag)-[:AFFECTS]->(Service)` | | seed fallback map |
+| `(FeatureFlag)-[:AFFECTS]->(Service)` | source (`spans`), last_seen | `feature_flag.evaluation` span events (services that evaluate the flag); seed map as fallback |
 | `(Change)-[:CHANGED]->(FeatureFlag \| Container)` | | |
 | `(Alert)-[:FIRED_ON]->(node)`, `(Alert)-[:PART_OF]->(Incident)` | | |
 | `(a)-[:BLAMES]->(b)` | weight | **transient**, rebuilt every tick between `:Anomalous` nodes |
