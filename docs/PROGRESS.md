@@ -7,6 +7,11 @@ and the output is pasted below it.
 What did run (2026-10-15): `ruff check backend tests scripts` clean; `pytest tests/unit` 46 passed;
 `pytest tests/graph tests/scenarios` collected 83 tests, all skipped (no Docker); `npm run build` of the UI succeeded.
 
+**Update 2026-10-15 ~4 PM IST (review run, FalkorDB 4.18.3, no OTel demo):** `ruff` clean; `pytest tests/unit tests/graph`
+130 passed, 1 skipped (after fixing `evidence_path` and the WCC filter-drop bug). Synthetic-traffic smoke test: payment errors →
+1 incident, top-1 `payment`, correct evidence path; vanished payment server spans → top-1 `edge:checkout->payment`.
+These are NOT acceptance checks — the boxes below still need the real demo.
+
 | # | Milestone | Code | Acceptance check |
 |---|---|---|---|
 | M0 | Skeleton, Makefile, compose, settings, FalkorDB, `make seed` | done | [ ] `make up && make seed` → labels/counts show teams + journeys |

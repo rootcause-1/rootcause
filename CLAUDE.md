@@ -6,6 +6,8 @@ RootCause turns live OpenTelemetry traces and metrics from the official OpenTele
 
 The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If this file and the PRD disagree, ask a human before building.**
 
+> **Start every session by reading §16 (current state).** All milestones are already coded; the job now is to run, verify, fix and ship — not to rewrite.
+
 ---
 
 ## 0. Non-negotiables (hackathon rules — breaking one can disqualify us)
@@ -22,7 +24,7 @@ The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If 
 
 ## 1. How to work in this repo
 
-- Build in the **milestone order in §12**. Do not start a milestone until the previous one's acceptance check passes. Run the check, show the output, then tick it in `docs/PROGRESS.md`.
+- Code for every milestone exists. Work through the **acceptance checks in §12 in order**: run the check, fix what breaks, paste the output into `docs/PROGRESS.md`, tick it. Do not rewrite a working module; make the smallest fix that makes the check pass.
 - **Verify, don't assume.** Several external details below are marked `VERIFY`. Before relying on one, check it against the running system (curl the endpoint, list the metric names, read the file in the demo repo) and record the real value in `config/rootcause.yaml`. Never guess metric names, ports or file paths.
 - Small commits with clear messages (`feat(engine): WCC alert grouping`). Commit after every green check.
 - Run `make lint test` before every commit. Fix failures; don't skip tests.
@@ -526,3 +528,36 @@ Before M10, break **every** catalogue flag once by hand, write what you observe 
 - Keep the UI usable when the graph is empty (first 3 minutes of baseline learning: show "Learning baseline… 2:10 left").
 - Port clashes: the demo uses 8080 (proxy) and its own internal ports. Map FalkorDB's browser to host **3300** and Redis protocol to host **6380**; inside the Docker network keep `falkordb:6379`. Our API on host 8000, UI on 5173 (dev) / 8088 (built), MCP HTTP on 8811.
 - When you are unsure whether something is cheating (e.g. reading the flag to pick a root), it is. Ask.
+
+### FalkorDB behaviour verified by running the graph tests (module 4.18.3)
+- `shortestPath` is only allowed inside `WITH`/`RETURN`, never in `MATCH p = shortestPath(...)` (fixed in `evidence_path.cypher`).
+- **`algo.WCC` silently drops its filters when a label or relationship type in them does not exist in the graph yet** and then runs over the whole graph (seed teams, runbooks, flags…). `engine/grouping.py` guards this with `anomalous_nodes` + `blames_count`; keep that guard. Apply the same guard to any new `algo.*` call whose filter label/type can be absent. `algo.pageRank(label, rel)` returns no rows in that case (safe).
+- `SET n:Anomalous` / `REMOVE n:Anomalous`, `SET n += $map`, map literals in `collect({...})`: all work (tests pass).
+- Pin the Docker image once the graph tests pass against it: replace `falkordb/falkordb:latest` in both compose files with the exact tag you tested (`docker image inspect` → version), so a new release can't break the demo.
+
+
+---
+
+## 16. Current state and how to continue (updated 15 Oct, ~4 PM IST)
+
+**State:** every milestone M0–M11 is coded (by Shambhvi + Claude Code). On a machine with FalkorDB (no OTel demo):
+- `make lint` clean; `pytest tests/unit tests/graph` → **130 passed, 1 skipped** (all 74 `.cypher` files run against a real FalkorDB 4.18.3).
+- End-to-end smoke with `scripts/synthetic_traffic.py` (synthetic OTLP spans, **dev only**): healthy → no incidents; payment errors → one incident, top-1 `payment`, evidence path `frontend-proxy → frontend → checkout → payment`, checkout journey impact, owner + proposals; payment server spans vanish → top-1 `edge:checkout->payment`.
+- **Nothing has run against the real OpenTelemetry Demo yet.** No acceptance check in `docs/PROGRESS.md` is ticked.
+
+**Fixed in this review (don't undo):** `evidence_path` shortestPath form; WCC filter-drop bug (fresh graph produced fake incidents of teams/runbooks); the agent now re-investigates (max 3×, before any approval) when the engine's top cause changes — needed because "traffic vanished" edge causes only appear once the 60 s window rolls over; catalogue truths for `kafkaConsumerDead` / `kafkaQueueProblems` → `fraud-detection` (per OTel docs), all 16 flag names confirmed against the OTel docs (variants still VERIFY).
+
+**Do next, in this order** (feature freeze 18 Oct 2 PM IST):
+1. `make demo-up` → the §5 VERIFY items → write real values into `config/rootcause.yaml` (exporter name/encoding, network, Prometheus queries via `scripts/discover_metrics.py`, flagd path + hot reload, agent URL, flag variants).
+2. `make up && make seed`, then acceptance checks **M0 → M8** against the live demo. Paste outputs in `docs/PROGRESS.md`.
+3. Break every catalogue flag once by hand (§12 note). Record what RootCause sees in `catalogue.yaml` comments. Report faults it can't see — don't add flag-specific hacks.
+4. `make record` the key scenarios (at least `paymentFailure`, `paymentUnreachable`, one latency, one invisible, one AI-agent if it works) → replay works → `make scenario-test` green.
+5. `make chaos N=15` → `docs/SCORECARD.md` (real numbers only, misses included).
+6. Public **replay** deployment (no Docker socket on hosted platforms; replay mode only) + README links + `docs/PRD.md` + video.
+
+**If time runs short, cut in this order:** AI-agent faults → predict tab polish → LLM agent mode (autopilot is the default and enough) → memory tab polish. Never cut: live incident flow (M4–M6), evidence path, scorecard, replay deployment, README/QUERIES.
+
+**Missing files to add:** `docs/PRD.md` (export from the team's PRD doc), `LICENSE` (team picks, e.g. MIT/Apache-2.0), README team section + video/deploy links. Decide whether to commit `uv.lock` (recommended, for reproducible installs).
+
+**Testing without the 6 GB demo** (e.g. on the smaller laptop): run FalkorDB, then
+`RC_CONFIG_DIR=<copy of config with detect.learn_seconds: 30> RC_TICK_SECONDS=2 uv run python -m rootcause.api` and `python scripts/synthetic_traffic.py` (see its docstring). Graph tests can target any FalkorDB via `FALKORDB_TEST_HOST`/`FALKORDB_TEST_PORT`.

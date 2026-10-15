@@ -8,14 +8,14 @@
 - {flag: cartFailure, variant: "on", off: "off", truth: cart, class: errors}
 - {flag: adFailure, variant: "on", off: "off", truth: ad, class: errors}
 - {flag: productCatalogFailure, variant: "on", off: "off", truth: product-catalog, class: errors}
-- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}   # VERIFY flag name
-- {flag: imageSlowLoad, variant: "5sec", off: "off", truth: image-provider, class: latency}
-- {flag: intlShippingSlowdown, variant: "on", off: "off", truth: shipping, class: latency}   # VERIFY flag name
+- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}   # flag name confirmed in OTel docs; VERIFY variant
+- {flag: imageSlowLoad, variant: "5sec", off: "off", truth: image-provider, class: latency}   # VERIFY truth: docs say the delay is injected by Envoy (frontend-proxy) fault injection on image requests, so the engine may (correctly) point at frontend-proxy or the edge frontend-proxy->image-provider
+- {flag: intlShippingSlowdown, variant: "on", off: "off", truth: shipping, class: latency}   # flag name confirmed in OTel docs; VERIFY variant
 - {flag: adHighCpu, variant: "on", off: "off", truth: ad, class: invisible}
 - {flag: adManualGc, variant: "on", off: "off", truth: ad, class: latency}
 - {flag: emailMemoryLeak, variant: "100x", off: "off", truth: email, class: invisible}
 - {flag: recommendationCacheFailure, variant: "on", off: "off", truth: recommendation, class: invisible}
-- {flag: kafkaQueueProblems, variant: "on", off: "off", truth: "queue:orders", class: invisible}
-- {flag: kafkaConsumerDead, variant: "on", off: "off", truth: accounting, class: invisible}   # VERIFY flag name + which consumer
-- {flag: aiRunawayAgent, variant: "on", off: "off", truth: agent, class: ai}   # VERIFY flag name
-- {flag: aiSlowResponse, variant: "on", off: "off", truth: agent, class: ai}   # VERIFY flag name
+- {flag: kafkaQueueProblems, variant: "on", off: "off", truth: fraud-detection, class: invisible}   # docs: "slows the fraud consumer by a per-record delay"; BLAMES makes a lagging queue blame its consumer. VERIFY variant (may be a number)
+- {flag: kafkaConsumerDead, variant: "on", off: "off", truth: fraud-detection, class: invisible}   # docs: "removes fraud detection from the orders consumer group"
+- {flag: aiRunawayAgent, variant: "on", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True
+- {flag: aiSlowResponse, variant: "on", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True

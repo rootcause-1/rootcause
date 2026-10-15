@@ -12,8 +12,18 @@ from rootcause.graph.client import GraphDB
 
 
 async def components(db: GraphDB) -> list[list[str]]:
+    # FalkorDB quirk (verified on 4.18): if a label or relationship type in algo.WCC's filter does not exist in the
+    # graph yet, the filter is silently ignored and WCC runs over the WHOLE graph (teams, runbooks, flags...).
+    # So: no :Anomalous nodes -> no incidents; anomalous nodes but no BLAMES edges -> each node is its own component.
+    anomalous = [r["id"] for r in await db.run("anomalous_nodes")]
+    if not anomalous:
+        return []
+    if not (await db.run("blames_count"))[0]["n"]:
+        return [[a] for a in sorted(anomalous)]
     rows = await db.run("group_incidents")
-    return [sorted(r["members"]) for r in rows if r["members"]]
+    allowed = set(anomalous)
+    comps = [sorted(m for m in r["members"] if m in allowed) for r in rows]
+    return [c for c in comps if c]
 
 
 def match_components(comps: list[list[str]], incidents: list[dict[str, Any]]

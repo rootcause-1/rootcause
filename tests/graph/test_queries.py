@@ -155,3 +155,9 @@ async def test_similar_incidents_jaccard(db):
     await db.run("resolve_incident", id="INC-0001", now=NOW, resolution="fixed", action=None)
     rows = await db.run("similar_incidents", id="INC-0002")
     assert rows[0]["incident"] == "INC-0001" and rows[0]["jaccard"] == pytest.approx(1.0)
+
+
+async def test_no_anomalies_means_no_incidents(db):
+    """Regression: on a fresh graph algo.WCC ignored the missing :Anomalous label and grouped seed nodes."""
+    from rootcause.engine import grouping
+    assert await grouping.components(db) == []

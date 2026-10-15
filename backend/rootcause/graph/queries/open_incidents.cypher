@@ -3,4 +3,5 @@
 MATCH (i:Incident)
 WHERE i.status = 'open'
 RETURN i.id AS id, i.members AS members, i.created_ts AS created_ts, i.onset_ts AS onset_ts,
-       i.agent_state AS agent_state, i.quiet_ticks AS quiet_ticks
+       i.agent_state AS agent_state, i.quiet_ticks AS quiet_ticks,
+       i.root_target AS root_target, i.verdict_root AS verdict_root, i.reinvestigations AS reinvestigations

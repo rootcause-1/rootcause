@@ -83,6 +83,19 @@ class Runtime:
         delay_ms = int(float(self.s.c("engine", "agent_delay_seconds", default=15)) * 1000)
         for inc in await self.db.run("open_incidents"):
             ready = now - int(inc["created_ts"] or now) >= delay_ms
+            # Signals keep evolving after the first verdict (e.g. a callee's traffic only "vanishes" once the 60 s
+            # window rolls over), so re-run the agent if the engine's top cause changed and nothing was approved yet.
+            max_re = int(self.s.c("engine", "max_reinvestigations", default=3))
+            if (inc["agent_state"] in ("awaiting_approval", "done") and inc.get("verdict_root")
+                    and inc.get("root_target") and inc["root_target"] != inc["verdict_root"]
+                    and int(inc.get("reinvestigations") or 0) < max_re):
+                log.info("incident %s: top cause changed %s -> %s, re-investigating",
+                         inc["id"], inc["verdict_root"], inc["root_target"])
+                await self.db.run("set_incident_props", id=inc["id"], props={
+                    "agent_state": "pending", "reinvestigations": int(inc.get("reinvestigations") or 0) + 1})
+                await self.db.run("clear_proposed_actions", id=inc["id"])
+                inc["agent_state"] = "pending"
+                self.started.discard(inc["id"])
             if ready and inc["agent_state"] == "pending" and inc["id"] not in self.started:
                 self.started.add(inc["id"])
                 if self.inline_agent:
@@ -130,6 +143,7 @@ class Runtime:
         verdict["verdict_ts"] = now_ms()
         await self.db.run("set_incident_props", id=incident_id, props={
             "verdict": dumps(verdict), "verdict_ts": verdict["verdict_ts"],
+            "verdict_root": verdict.get("root_cause") or "",
             "agent_state": "awaiting_approval" if verdict.get("proposed_actions") else "done"})
         await self.sse.publish("incident", {"id": incident_id, "verdict": verdict})
         return verdict
