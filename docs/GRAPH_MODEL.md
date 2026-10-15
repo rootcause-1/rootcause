@@ -43,14 +43,14 @@ graph LR
 
 | Label | Key properties | Written by |
 |---|---|---|
-| Service | rps, err_rate, self_err_rate, p95_ms, server_spans, cpu_pct, mem_mb, mem_slope, tool_calls_per_run, llm_p95_ms, `bl_*` baselines, `hit_*`/`ok_*` rule counters, last_seen | ingest, detector |
+| Service | rps, err_rate, op_err_rate (worst route), self_err_rate, p95_ms, op_p95_ms (slowest route), server_spans (server + consumer spans), cpu_pct, mem_mb, mem_slope, gc_frac (JVM time in GC), runtime_mem_mb, tool_calls_per_run, llm_p95_ms, `bl_*` baselines, `hit_*`/`ok_*`/`nd_*` rule counters, last_seen | ingest, Prometheus, docker stats, detector |
 | Queue | produce_rate, consume_rate, lag, lag_slope, `bl_*` | ingest (spans + Prometheus) |
 | Datastore | system, rps, err_rate, p95_ms | ingest (db client spans) |
 | Container | cpu_pct, mem_mb, mem_slope | docker stats |
 | Journey | name, routes, success_rate, rps, bl_success_rate | seed + ingest |
 | Team, Person | name; Person.on_call, contact | seed |
 | Runbook | title, url, steps | seed |
-| FeatureFlag | variant | seed map + flag watcher |
+| FeatureFlag | variant (effective: `defaultVariant` or the targeting on-branch), baseline_variant (at first observation) | flag watcher, span flag evaluations, seed map |
 | Change | kind (flag/restart/die), from_variant, to, ts, actor (unknown/rootcause/harness) | flag watcher, docker events |
 | Alert | kind, target, value, threshold, baseline, dev, ts, status, resolved_ts | detector |
 | Incident | status, members, created_ts, onset_ts, root_target, confidence, agent_state, verdict (JSON), ttr_ms, resolution | engine, agent, verify |
@@ -69,7 +69,7 @@ removed by `resolve_alert` when no firing alert remains).
 
 | Relationship | Properties | Notes |
 |---|---|---|
-| `(Service)-[:CALLS]->(Service)` | protocol, rps, err_rate, p95_ms, unanswered_rate, baseline_err, baseline_p95, last_seen | from paired client/server spans |
+| `(Service)-[:CALLS]->(Service)` | protocol, rps, err_rate, p95_ms, unanswered_rate, unanswered_share, baseline_err, baseline_p95, last_seen | from paired client/server spans (callee named from `rpc.method` when unanswered) |
 | `(Service)-[:CALLED_BY]->(Service)` | protocol, rps, err_rate, last_seen | mirror of CALLS, same query; used by `algo.bfs` upstream walks |
 | `(Service)-[:PRODUCES_TO]->(Queue)` | rate | producer spans |
 | `(Queue)-[:CONSUMED_BY]->(Service)` | rate, group, last_seen | consumer spans |
