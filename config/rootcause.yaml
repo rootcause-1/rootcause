@@ -70,7 +70,7 @@ detect:
   latency_min_ms: 50
   lag_consume_ratio: 0.2
   lag_min_messages: 3                        # a lag of 1-2 orders is one message in flight, not a backlog
-  latency_min_samples: 5                     # p95 of fewer server spans in the window is noise (checkout runs ~3/min)
+  latency_min_samples: 10                    # a p95 of fewer requests is just their max (agent: ~9 spiky VCR runs/min)
   mem_slope_mb_per_min: 5
   mem_sigma: 3.0                             # and above baseline slope + 3 x its mean deviation
   cpu_pct: 85

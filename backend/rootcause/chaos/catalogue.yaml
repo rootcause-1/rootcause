@@ -37,8 +37,10 @@
 - {flag: adManualGc, variant: "on", off: "off", truth: ad, class: latency}
   # ad spends ~30 % of wall time in GC (jvm_gc_duration_seconds); latency on ad (p95 1.5-3 s) at t=30-43 s
   # -> top-1 ad (0.90). A spiky agent latency alert opened a separate small incident.
-- {flag: emailMemoryLeak, variant: "100x", off: "off", truth: email, class: invisible}
-  # see docs/PROGRESS.md: needs minutes to show (memory slope over 2 min, must hold 2 min).
+- {flag: emailMemoryLeak, variant: "1000x", off: "off", truth: email, class: invisible}
+  # 100x (~200 KB retained per email, ~2.4 MB/min at our order rate) stayed under the 5 MB/min memory rule for 7 min:
+  # not visible. 1000x (the demo's own variant, ~10x the leak) -> latency on email (building the huge body) at t=41 s
+  # -> top-1 email (0.90), change linked, flag revert proposed first.
 - {flag: recommendationCacheFailure, variant: "on", off: "off", truth: recommendation, class: invisible}
   # latency on recommendation at t=117 s, then frontend/proxy errors and latency -> top-1 recommendation (0.90).
 - {flag: kafkaQueueProblems, variant: "3sec", off: "off", truth: [fraud-detection, checkout], class: invisible}

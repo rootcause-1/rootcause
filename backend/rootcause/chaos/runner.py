@@ -123,7 +123,7 @@ class ChaosRunner:
             mine = [i for i in await facts.list_incidents(self.db, "all")
                     if int(i.get("created_ts") or 0) >= t0 and i.get("verdict_ts")]
             if mine:
-                verdict_inc = max(mine, key=lambda i: len(i.get("members") or []))
+                verdict_inc = max(mine, key=lambda i: (len(i.get("members") or []), -int(i.get("created_ts") or 0)))
             return bool(mine)
 
         if await self._wait(has_verdict, 180):
