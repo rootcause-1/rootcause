@@ -45,7 +45,10 @@ async def test_top1_matches_truth(falkor_addr, scenario):
         assert rows, f"{scenario}: no incident opened"
         main = max(rows, key=lambda r: (len(r.get("members") or []), r.get("confidence") or 0))
         hyps = (await db.run("get_incident", id=main["id"]))[0]["hyps"]
-        top = sorted([h for h in hyps if h.get("target")], key=lambda h: h["rank"])[0]["target"]
+        best = sorted([h for h in hyps if h.get("target")], key=lambda h: h["rank"])[0]
+        top = best["target"]
         assert top in TRUTH[flag], f"{scenario}: top-1 {top}, truth {TRUTH[flag]}"
+        # the flag flip is in every recording: the winner must see it as a recent change
+        assert (best.get("change") or 0) > 0, f"{scenario}: no change linked to {top}"
     finally:
         await db.delete()

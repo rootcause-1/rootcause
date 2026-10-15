@@ -282,7 +282,11 @@ class MarkerReq(BaseModel):
 
 @app.post("/api/record/start")
 async def record_start(body: RecordReq) -> dict[str, Any]:
-    return {"path": S.recorder.start(body.scenario, {"scenario": body.scenario})}
+    path = S.recorder.start(body.scenario, {"scenario": body.scenario})
+    s = get_settings()
+    if s.flagd_path:  # the flag state at the start, so a replay sees the flip as a change from it
+        S.recorder.write({"type": "flag_config", "ts": now_ms(), "data": read_config(s.flagd_path)})
+    return {"path": path}
 
 
 @app.post("/api/record/marker")
