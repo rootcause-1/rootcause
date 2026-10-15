@@ -39,7 +39,7 @@ The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If 
 | --- | --- |
 | Target system | OpenTelemetry Demo, Docker Compose, **agentic mode** (`make start-agentic`) |
 | Backend | Python 3.12, FastAPI, uvicorn, asyncio, `httpx`, `pydantic` v2, `pyyaml` |
-| Graph | FalkorDB (`falkordb/falkordb:latest`), Python client `falkordb` (use `falkordb.asyncio` in async code) |
+| Graph | FalkorDB (`falkordb/falkordb:v4.22.1`, pinned), Python client `falkordb` (use `falkordb.asyncio` in async code) |
 | MCP | Official Python MCP SDK (`mcp`), `FastMCP`, transports: stdio and streamable HTTP |
 | LLM | Anthropic Python SDK, model from env `RC_LLM_MODEL` (default `claude-sonnet-5-5`), temperature 0 |
 | Containers | Docker SDK for Python (`docker`) via mounted `/var/run/docker.sock` |

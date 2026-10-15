@@ -4,7 +4,7 @@ name: rootcause
 
 services:
   falkordb:
-    image: falkordb/falkordb:latest
+    image: falkordb/falkordb:v4.22.1
     ports:
       - "6380:6379"   # Redis protocol (host 6380 avoids clashes)
       - "3300:3000"   # FalkorDB Browser

@@ -4,7 +4,7 @@ name: rootcause-replay
 
 services:
   falkordb:
-    image: falkordb/falkordb:latest
+    image: falkordb/falkordb:v4.22.1
 
   rootcause-api:
     build: {context: .., dockerfile: infra/Dockerfile.api}

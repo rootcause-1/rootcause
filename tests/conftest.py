@@ -23,7 +23,7 @@ def falkor_addr():
         from testcontainers.core.container import DockerContainer
         from testcontainers.core.waiting_utils import wait_for_logs
 
-        c = DockerContainer("falkordb/falkordb:latest").with_exposed_ports(6379)
+        c = DockerContainer("falkordb/falkordb:v4.22.1").with_exposed_ports(6379)
         c.start()
     except Exception as exc:  # no docker on this machine
         pytest.skip(f"FalkorDB test container unavailable: {exc}")
