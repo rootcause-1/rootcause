@@ -105,6 +105,41 @@ def parse_otlp_json(doc: dict[str, Any], offset_ms: int = 0) -> list[Span]:
     return out
 
 
+# Every span attribute the ingest reads (ingest/spans.py). The recorder keeps only these, plus flag-evaluation
+# events, so replay files stay small while the engine sees exactly the same inputs. A unit test keeps it in sync.
+USED_SPAN_ATTRIBUTES = frozenset({
+    "db.name", "db.namespace", "db.system", "db.system.name", "gen_ai.operation.name", "gen_ai.request.model",
+    "http.method", "http.protocol", "http.request.method", "http.response.status_code", "http.route",
+    "http.status_code", "http.target", "http.url", "messaging.consumer.group.name", "messaging.destination",
+    "messaging.destination.name", "messaging.kafka.consumer.group", "messaging.kafka.consumer_group",
+    "messaging.kafka.topic", "messaging.system", "net.peer.name", "peer.service", "rpc.method", "rpc.service",
+    "rpc.system", "rpc.system.name", "server.address", "url.full", "url.path",
+})
+
+
+def compact_otlp(doc: dict[str, Any]) -> dict[str, Any]:
+    """Drop span attributes and events the ingest never reads (used by the replay recorder)."""
+    out = []
+    for rs in doc.get("resourceSpans", []) or []:
+        res = [kv for kv in (rs.get("resource") or {}).get("attributes", []) if kv.get("key") == "service.name"]
+        scopes = []
+        for ss in rs.get("scopeSpans", []) or rs.get("instrumentationLibrarySpans", []) or []:
+            spans = []
+            for sp in ss.get("spans", []) or []:
+                slim = {k: v for k, v in sp.items() if k not in ("attributes", "events", "links", "traceState")}
+                slim["attributes"] = [kv for kv in sp.get("attributes") or [] if kv.get("key") in USED_SPAN_ATTRIBUTES]
+                flags = [{"name": "feature_flag.evaluation",
+                          "attributes": [kv for kv in ev.get("attributes") or [] if kv.get("key") == "feature_flag.key"]}
+                         for ev in sp.get("events") or []
+                         if any(kv.get("key") == "feature_flag.key" for kv in ev.get("attributes") or [])]
+                if flags:
+                    slim["events"] = flags
+                spans.append(slim)
+            scopes.append({"spans": spans})
+        out.append({"resource": {"attributes": res}, "scopeSpans": scopes})
+    return {"resourceSpans": out}
+
+
 def protobuf_to_json(body: bytes) -> dict[str, Any]:
     """Fallback if the collector cannot send JSON: decode protobuf into the same JSON shape.
 

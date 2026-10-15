@@ -170,3 +170,31 @@ async def test_replay_warm_fast_forwards_healthy_segment_to_now(tmp_path):
     assert time.time() * 1000 - t0 < 2_000            # seconds, not a minute
     assert abs(fed[-1] - t0) < 2_000                   # the healthy segment ends "now"
     assert len(ticks) == 13 and ticks == sorted(ticks)  # one virtual tick per 5 s of recorded time
+
+
+def test_compact_otlp_keeps_every_attribute_the_ingest_reads():
+    from rootcause.ingest.otlp import USED_SPAN_ATTRIBUTES, compact_otlp, parse_otlp_json
+    from rootcause.ingest.spans import IngestConfig, aggregate_traces
+
+    src = (BACKEND / "ingest" / "spans.py").read_text()
+    read = set(re.findall(r'(?:attrs|\ba)(?:\.get\(|\[)"([a-z_.]+)"', src))
+    read |= {k for tup in re.findall(r'(?:for (?:k|key) in|in a for k in) \(([^)]*)\)', src)
+             for k in re.findall(r'"([a-z_.]+)"', tup)}
+    read |= set(re.findall(r'"([a-z_.]+)" in s\.attrs', src))
+    assert read and read <= USED_SPAN_ATTRIBUTES, read - USED_SPAN_ATTRIBUTES
+
+    kv = lambda k, v: {"key": k, "value": {"stringValue": v}}  # noqa: E731
+    doc = {"resourceSpans": [{"resource": {"attributes": [kv("service.name", "checkout"), kv("host.name", "h")]},
+                              "scopeSpans": [{"scope": {"name": "x"}, "spans": [{
+                                  "traceId": "t", "spanId": "1", "parentSpanId": "", "name": "Charge", "kind": 3,
+                                  "startTimeUnixNano": "1000000000", "endTimeUnixNano": "1002000000",
+                                  "status": {"code": 2},
+                                  "attributes": [kv("rpc.method", "oteldemo.PaymentService/Charge"), kv("big", "x" * 999)],
+                                  "events": [{"name": "feature_flag.evaluation", "attributes": [
+                                      kv("feature_flag.key", "paymentUnreachable"), kv("feature_flag.provider.name", "f")]},
+                                      {"name": "exception", "attributes": [kv("exception.stacktrace", "y" * 999)]}]}]}]}]}
+    small = compact_otlp(doc)
+    assert len(json.dumps(small)) < len(json.dumps(doc)) / 2
+    cfg = IngestConfig(finalise_lag_ms=0, peer_aliases={"oteldemo.PaymentService": "payment"})
+    agg = lambda d: aggregate_traces({"t": parse_otlp_json(d)}, 0, 10**12, cfg)  # noqa: E731
+    assert agg(small).calls == agg(doc).calls and agg(small).flag_affects == agg(doc).flag_affects

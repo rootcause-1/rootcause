@@ -1,5 +1,5 @@
 """Recorder: tees every engine input (OTLP batches, metric samples, docker stats/events, flag configs) with its
-timestamp to replay/<scenario>.jsonl.gz, plus `marker` events for segment boundaries
+timestamp to replay/<scenario>.jsonl.gz (OTLP compacted to the attributes the ingest reads), plus `marker` events for segment boundaries
 (healthy -> break -> broken -> fix -> recovery). No graph queries.
 """
 
@@ -11,6 +11,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from rootcause.ingest.otlp import compact_otlp
 from rootcause.util import now_ms
 
 
@@ -39,6 +40,8 @@ class Recorder:
     def write(self, ev: dict[str, Any]) -> None:
         if self._fh is None:
             return
+        if ev.get("type") == "otlp":  # keep only what the ingest reads (same engine inputs, ~3x smaller files)
+            ev = {**ev, "data": compact_otlp(ev["data"])}
         with self._lock:
             self._fh.write(json.dumps(ev, separators=(",", ":")) + "\n")
             self.events += 1
