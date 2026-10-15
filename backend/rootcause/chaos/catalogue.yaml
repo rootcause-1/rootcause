@@ -1,21 +1,56 @@
 # Chaos catalogue: flag -> ground truth. Used ONLY by the chaos harness for scoring, never by the engine.
-# Variants verified against demo src/flagd/demo.flagd.json (demo commit df9f4d0, 15 Oct 2026). VERIFY every and every `truth` by breaking the flag once by hand (CLAUDE.md §12),
-# then write what you observed (which alerts, which nodes) in the comments. A human confirms each entry.
-# `off` is the variant the harness restores between runs (VERIFY it exists for every flag).
+# Variants verified against demo src/flagd/demo.flagd.json (demo commit df9f4d0, 15 Oct 2026). Truths come from the demo
+# source/docs and were fixed before the runs that scored them. `off` is the variant the harness restores (exists for all).
+# Flags with a `targeting.if` rule (productCatalogFailure) are switched through the rule's on-branch, as the demo's
+# flag UI does (actions/flagd.py).
+#
+# Observed when broken by hand on the live demo, 15-16 Oct 2026 (LOCUST_USERS=12, scripts/acceptance_check.py;
+# logs summarised in docs/PROGRESS.md). "t=" = seconds after the flip; "-> top-1" = engine verdict.
 
 - {flag: paymentFailure, variant: "100%", off: "off", truth: payment, class: errors}
+  # error_rate on payment, checkout, frontend, frontend-proxy at t=26 s -> 1 incident, top-1 payment (0.90), evidence
+  # frontend-proxy->frontend->checkout->payment, change paymentFailure linked, checkout journey -78..-100 %.
 - {flag: paymentUnreachable, variant: "on", off: "off", truth: "edge:checkout->payment", class: errors}
+  # error_rate on checkout, frontend, frontend-proxy at t=19 s (payment itself is silent: checkout dials "badAddress")
+  # -> top-1 edge:checkout->payment (0.90) at t=34 s via unanswered calls named from rpc.method.
 - {flag: cartFailure, variant: "100%", off: "off", truth: cart, class: errors}
+  # error_rate on cart at t=20 s, then checkout/cart latency -> top-1 cart (0.90) at t=35 s.
 - {flag: adFailure, variant: "on", off: "off", truth: ad, class: errors}
+  # error_rate on ad (12 %), frontend, frontend-proxy at t=48 s -> top-1 ad (0.90) at t=63 s.
 - {flag: productCatalogFailure, variant: "on", off: "off", truth: product-catalog, class: errors}
-- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}   # product-catalog's own loop takes an ACCESS EXCLUSIVE lock on catalog tables (product-catalog/main.go triggerLockContention); the slow DB calls are a symptom
-- {flag: imageSlowLoad, variant: "5sec", off: "off", truth: frontend-proxy, class: latency}   # truth from demo source (decided before the sweep): the browser sends `x-envoy-fault-delay-request` (frontend/components/ProductCard.tsx) and Envoy in frontend-proxy injects the delay; image-provider itself is not slow
+  # one product id fails: error_rate on frontend-proxy/frontend (route /api/products/[id]) t=20-30 s, product-catalog
+  # 6 % at t=55 s -> top-1 product-catalog at t=55 s. (Before the targeting fix the harness never injected it.)
+- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}
+  # product-catalog's own loop takes an ACCESS EXCLUSIVE lock on catalog tables (product-catalog/main.go
+  # triggerLockContention). Observed: 12 alerts (latency+errors on product-catalog, db:astronomy-db, recommendation,
+  # frontend, frontend-proxy, checkout) -> 1 incident; top-1 db:astronomy-db 0.76, truth #2 at 0.73. KNOWN MISS (top-3):
+  # the slow DB looks like the deepest failure; the first proposed action is still the right flag revert.
+- {flag: imageSlowLoad, variant: "5sec", off: "off", truth: frontend-proxy, class: latency}
+  # truth from demo source: the browser sends `x-envoy-fault-delay-request` (frontend/components/ProductCard.tsx) and
+  # Envoy in frontend-proxy injects the delay; image-provider itself is not slow. Observed: latency on frontend-proxy
+  # at t=33 s -> top-1 frontend-proxy (0.75, no change linked: only the browser evaluates this flag).
 - {flag: intlShippingSlowdown, variant: "5sec", off: "off", truth: shipping, class: latency}
+  # only non-US orders (1 of 9 load-generator customers) wait 5 s in /ship-order: invisible in shipping's service
+  # p95, caught by the slowest-route p95 -> latency on shipping, checkout, frontend at t=138 s -> top-1 shipping.
 - {flag: adHighCpu, variant: "on", off: "off", truth: ad, class: invisible}
+  # no errors; docker stats cpu on ad (400 %) at t=15 s -> top-1 ad (1.00) at t=30 s.
 - {flag: adManualGc, variant: "on", off: "off", truth: ad, class: latency}
+  # ad spends ~30 % of wall time in GC (jvm_gc_duration_seconds); latency on ad (p95 1.5-3 s) at t=30-43 s
+  # -> top-1 ad (0.90). A spiky agent latency alert opened a separate small incident.
 - {flag: emailMemoryLeak, variant: "100x", off: "off", truth: email, class: invisible}
+  # see docs/PROGRESS.md: needs minutes to show (memory slope over 2 min, must hold 2 min).
 - {flag: recommendationCacheFailure, variant: "on", off: "off", truth: recommendation, class: invisible}
-- {flag: kafkaQueueProblems, variant: "3sec", off: "off", truth: [fraud-detection, checkout], class: invisible}   # two effects in the demo source: checkout floods `orders` with N extra copies per order (checkout/main.go) and fraud-detection sleeps N ms per record (fraud-detection/main.kt); either is a correct root (decided from source before re-running)
-- {flag: kafkaConsumerDead, variant: "on", off: "off", truth: fraud-detection, class: invisible}   # docs: "removes fraud detection from the orders consumer group"
-- {flag: aiRunawayAgent, variant: "on", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True
-- {flag: aiSlowResponse, variant: "5sec", off: "off", truth: agent, class: ai}   # flag name confirmed in OTel docs; VERIFY it changes behaviour with USE_VCR=True
+  # latency on recommendation at t=117 s, then frontend/proxy errors and latency -> top-1 recommendation (0.90).
+- {flag: kafkaQueueProblems, variant: "3sec", off: "off", truth: [fraud-detection, checkout], class: invisible}
+  # two effects in the demo source: checkout floods `orders` with N extra copies per order (checkout/main.go) and
+  # fraud-detection sleeps N ms per record (fraud-detection/main.kt); either is a correct root (decided from source
+  # before re-running). Observed: db:astronomy-db errors (accounting flooded) t=19 s, fraud-detection consumer latency
+  # 3 s at t=24 s, orders lag 15k at t=34 s -> main incident top-1 fraud-detection (0.90); the DB opens its own incident.
+- {flag: kafkaConsumerDead, variant: "on", off: "off", truth: fraud-detection, class: invisible}
+  # fraud-detection leaves the group: no errors anywhere; lag on queue:orders at t=57 s, its CONSUMED_BY edge goes
+  # silent -> top-1 fraud-detection (0.90) at t=77 s (vanished-consumer rule).
+- {flag: aiRunawayAgent, variant: "on", off: "off", truth: agent, class: ai}
+  # works with USE_VCR=True (cassettes contain the 20-iteration run): agent_loop (tool calls/run 3.75x baseline),
+  # error_rate + latency on agent at t=21-36 s -> top-1 agent (0.95).
+- {flag: aiSlowResponse, variant: "5sec", off: "off", truth: agent, class: ai}
+  # works with USE_VCR=True (sleep before the replayed LLM call): llm_latency 5 s at t=41 s -> top-1 agent (1.00).
