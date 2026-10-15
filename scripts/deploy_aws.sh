@@ -8,6 +8,8 @@ HOST="${1:-${RC_DEMO_HOST:-3.234.90.242}}"
 KEY="${2:-${RC_DEMO_KEY:-$HOME/.ssh/rootcause-demo.pem}}"
 REPO="https://github.com/rootcause-1/rootcause.git"
 
+# port 22 is occasionally flaky from some networks: retry the connection a few times
+for i in 1 2 3 4 5; do ssh -i "$KEY" -o ConnectTimeout=20 "ec2-user@$HOST" true && break; echo "ssh retry $i"; sleep 5; done
 ssh -i "$KEY" -o ConnectTimeout=20 "ec2-user@$HOST" bash -s <<EOF
 set -euo pipefail
 [ -d rootcause/.git ] || git clone --depth 50 "$REPO" rootcause
