@@ -121,9 +121,9 @@ def test_baseline_methods():
 
 
 def test_scorecard_render_counts_from_runs():
-    runs = [{"flag": "paymentFailure", "truth": "payment", "class": "errors", "top1": True, "ttd_ms": 30000,
+    runs = [{"flag": "paymentFailure", "truth": "payment", "class": "errors", "top1": True, "ttd_ms": 30000, "incident_id": "INC-1",
              "verdict": "payment", "results": '{"rootcause": ["payment"], "first_alert": ["frontend"]}'},
-            {"flag": "adHighCpu", "truth": "ad", "class": "invisible", "top1": False, "ttd_ms": 50000,
+            {"flag": "adHighCpu", "truth": "ad", "class": "invisible", "top1": False, "ttd_ms": 50000, "incident_id": "INC-2",
              "verdict": "frontend", "miss_reason": "truth ranked 2",
              "results": '{"rootcause": ["frontend", "ad"], "first_alert": ["ad"]}'}]
     md = render(runs, "b1")
@@ -140,3 +140,15 @@ def test_any_of_truth():
     assert truths("payment") == ["payment"]
     assert hit(["checkout", "x"], "fraud-detection | checkout", 1) is True
     assert hit(["x", "y", "z", "checkout"], "fraud-detection | checkout", 3) is False
+
+
+def test_scorecard_scores_every_method_on_the_same_runs():
+    from rootcause.chaos.scorecard import render
+
+    runs = [{"flag": "a", "truth": "x", "class": "errors", "top1": True, "incident_id": "INC-1", "ttd_ms": 1000,
+             "results": '{"rootcause": ["x"], "loudest_alert": ["y"]}'},
+            {"flag": "b", "truth": "z", "class": "errors", "top1": False, "incident_id": None, "ttd_ms": None,
+             "verdict": None, "miss_reason": "no incident", "results": '{"rootcause": []}'}]
+    md = render(runs, "b1")
+    assert "| rootcause | 50% | 50% | 1 s | 2 |" in md
+    assert "| loudest_alert | 0% | 0% | - | 2 |" in md
