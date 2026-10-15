@@ -23,7 +23,7 @@ from rootcause.util import new_id
 log = logging.getLogger(__name__)
 
 RULE_KINDS = {
-    "Service": ("error_rate", "latency", "memory", "cpu", "agent_loop", "llm_latency"),
+    "Service": ("error_rate", "latency", "memory", "cpu", "gc", "agent_loop", "llm_latency"),
     "Datastore": ("error_rate", "latency"),
     "Queue": ("lag",),
 }
@@ -96,6 +96,12 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
         cpu = _f(p, "cpu_pct")
         if cpu is not None and cpu > c["cpu_pct"]:
             out["cpu"] = Breach("cpu", cpu, c["cpu_pct"], _f(p, "bl_cpu_pct", 0.0), _f(p, "bl_cpu_pct_dev", 0.0))
+
+    if "gc" in out:  # JVM time-in-GC fraction (Prometheus), e.g. forced full GCs or heap pressure
+        gc, bl, dev = _f(p, "gc_frac"), _f(p, "bl_gc_frac", 0.0) or 0.0, _f(p, "bl_gc_frac_dev", 0.0) or 0.0
+        thr = max(c.get("gc_min_frac", 0.05), bl + 3.0 * dev)
+        if gc is not None and gc > thr:
+            out["gc"] = Breach("gc", gc, thr, bl, dev)
 
     if "agent_loop" in out:
         tc, bl = _f(p, "tool_calls_per_run"), _f(p, "bl_tool_calls_per_run")

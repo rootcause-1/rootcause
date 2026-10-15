@@ -10,7 +10,7 @@ from typing import Any
 
 # metrics we keep a baseline for, per node label
 TRACKED: dict[str, tuple[str, ...]] = {
-    "Service": ("rps", "err_rate", "op_err_rate", "self_err_rate", "p95_ms", "op_p95_ms", "cpu_pct", "mem_slope", "tool_calls_per_run",
+    "Service": ("rps", "err_rate", "op_err_rate", "self_err_rate", "p95_ms", "op_p95_ms", "cpu_pct", "mem_slope", "gc_frac", "tool_calls_per_run",
                 "llm_p95_ms"),
     "Datastore": ("rps", "err_rate", "p95_ms"),
     "Queue": ("lag", "produce_rate", "consume_rate"),

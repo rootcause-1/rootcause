@@ -149,3 +149,9 @@ def test_slowest_route_latency_fires_when_service_p95_is_diluted():
     # shipping: 1 in 28 requests (international ship-order) delayed 5 s -> service p95 unchanged, route p95 5 s
     p = {"rps": 0.5, "server_spans": 28, "p95_ms": 3.0, "bl_p95_ms": 2.0, "op_p95_ms": 5004.0, "bl_op_p95_ms": 3.0}
     assert evaluate("Service", p, C)["latency"].value == 5004.0
+
+
+def test_gc_pressure_rule():
+    c = {**C, "gc_min_frac": 0.05}
+    assert evaluate("Service", {"gc_frac": 0.003, "bl_gc_frac": 0.001}, c)["gc"] is None
+    assert evaluate("Service", {"gc_frac": 0.30, "bl_gc_frac": 0.001, "bl_gc_frac_dev": 0.001}, c)["gc"].value == 0.30

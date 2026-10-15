@@ -55,7 +55,7 @@ runbooks:
      remediates: ["cart:error_rate"]}
   - {id: rb-ad, service: ad, title: "Ad service errors / CPU / GC", url: "runbooks/ad.md",
      steps: ["Check ad CPU and GC", "Revert ad flags", "Restart ad"],
-     remediates: ["ad:error_rate", "ad:cpu", "ad:latency"]}
+     remediates: ["ad:error_rate", "ad:cpu", "ad:latency", "ad:gc"]}
   - {id: rb-product-catalog, service: product-catalog, title: "Catalog errors or lock contention", url: "runbooks/product-catalog.md",
      steps: ["Check catalog errors per product", "Revert catalog flags"],
      remediates: ["product-catalog:error_rate", "product-catalog:latency"]}
