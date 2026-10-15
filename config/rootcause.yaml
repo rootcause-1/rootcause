@@ -99,5 +99,8 @@ agent:
 verify:
   timeout_seconds: 90
 
+chaos:
+  settle_seconds: 45                         # after the first verdict, wait for re-investigations before scoring
+
 # never candidates for root cause, never alerted on
 non_candidates: [load-generator, frontend-web, flagd, flagd-ui, otel-collector, otelcol, rootcause-api, rootcause-mcp, rootcause-ui, jaeger, prometheus, grafana, opensearch]

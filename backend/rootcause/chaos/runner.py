@@ -2,7 +2,8 @@
 1. all catalogue flags to `off`; wait for no open incidents and 60 s healthy;
 2. pick a catalogue entry with a seeded RNG (logged) and flip it as the harness — the engine is not told
    (no API call, no graph write except the flag watcher's normal Change);
-3. wait up to 180 s for an incident with a final agent verdict; record the top-3 hypotheses and time to verdict;
+3. wait up to 180 s for an incident with an agent verdict, let it settle 45 s (re-investigations), record the
+   top-3 hypotheses and the time to the final verdict;
 4. revert the flag (as the harness, not the agent) and wait for recovery;
 5. score against catalogue truth, run the baselines on the same alert snapshot, write (:ChaosRun) into
    rc_eval_<batch> and regenerate docs/SCORECARD.md.
@@ -111,13 +112,18 @@ class ChaosRunner:
 
         async def has_verdict() -> bool:
             nonlocal verdict_inc
-            for inc in await facts.list_incidents(self.db, "all"):
-                if int(inc.get("created_ts") or 0) >= t0 and inc.get("verdict_ts"):
-                    verdict_inc = inc
-                    return True
-            return False
+            # the largest incident opened after the flip (side incidents can open at the same time)
+            mine = [i for i in await facts.list_incidents(self.db, "all")
+                    if int(i.get("created_ts") or 0) >= t0 and i.get("verdict_ts")]
+            if mine:
+                verdict_inc = max(mine, key=lambda i: len(i.get("members") or []))
+            return bool(mine)
 
-        await self._wait(has_verdict, 180)
+        if await self._wait(has_verdict, 180):
+            # the agent re-investigates while signals evolve (e.g. an edge cause appears once traffic is seen to
+            # vanish): score the verdict an on-call engineer would act on after a short look, and time it
+            await asyncio.sleep(float(self.s.c("chaos", "settle_seconds", default=45)))
+            await has_verdict()
         incident_id = verdict_inc["id"] if verdict_inc else None
         hyps: list[dict[str, Any]] = []
         if incident_id:
