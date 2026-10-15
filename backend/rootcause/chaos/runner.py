@@ -124,8 +124,17 @@ class ChaosRunner:
         async def has_verdict() -> bool:
             nonlocal verdict_inc
             # the largest incident opened after the flip (side incidents can open at the same time)
-            mine = [i for i in await facts.list_incidents(self.db, "all")
-                    if int(i.get("created_ts") or 0) >= t0 and i.get("verdict_ts")]
+            mine = []
+            for i in await facts.list_incidents(self.db, "all"):
+                created, verdict_ts = int(i.get("created_ts") or 0), int(i.get("verdict_ts") or 0)
+                if created >= t0 and verdict_ts:
+                    mine.append(i)
+                elif t0 - 300_000 <= created < t0 and verdict_ts >= t0:
+                    # an incident opened just before the flip (noise) that the fault's alerts then joined:
+                    # that is the incident an on-call engineer sees, scored on its verdict after the flip
+                    alerts = await self.db.run("incident_alert_snapshot", id=i["id"])
+                    if any(int(a.get("ts") or 0) >= t0 for a in alerts):
+                        mine.append(i)
             if mine:
                 verdict_inc = max(mine, key=lambda i: (len(i.get("members") or []), -int(i.get("created_ts") or 0)))
             return bool(mine)

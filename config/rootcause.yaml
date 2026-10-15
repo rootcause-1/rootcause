@@ -68,7 +68,7 @@ detect:
   error_min_count: 2                         # at least 2 failed requests in the window
   latency_factor: 2.0
   latency_sigma: 3.0                         # and above baseline + 3 x its mean deviation
-  latency_min_ms: 50
+  latency_min_ms: 100                        # a p95 under 100 ms is not a user-visible latency incident
   lag_consume_ratio: 0.2
   lag_min_messages: 3                        # a lag of 1-2 orders is one message in flight, not a backlog
   latency_min_samples: 10                    # a p95 of fewer requests is just their max (agent: ~9 spiky VCR runs/min)
