@@ -108,6 +108,10 @@ class ChaosRunner:
                     self._set(e["flag"], e.get("off", "off"))
             except Exception as exc:
                 log.warning("reset %s: %s", e["flag"], exc)
+        async def learned() -> bool:  # never break the system while baselines are still being learned
+            return self.rt.detector.learning_left_ms(now_ms()) == 0
+
+        await self._wait(learned, 600)
         await self._wait(self._no_open, 300)
         await self._healthy_for(60)
 
