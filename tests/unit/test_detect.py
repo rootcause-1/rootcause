@@ -136,3 +136,10 @@ def test_latency_threshold_respects_normal_spread():
     spiky = {"rps": 0.2, "p95_ms": 153.0, "bl_p95_ms": 78.0, "bl_p95_ms_dev": 30.0, "server_spans": 11}
     assert evaluate("Service", spiky, c)["latency"] is None       # 153 < 78 + 3*30
     assert evaluate("Service", {**spiky, "p95_ms": 5000.0}, c)["latency"] is not None
+
+
+def test_memory_slope_respects_normal_sawtooth():
+    c = {**C, "mem_sigma": 3.0}
+    node = {"mem_slope": 7.4, "bl_mem_slope": 0.5, "bl_mem_slope_dev": 3.0}
+    assert evaluate("Service", node, c)["memory"] is None            # 7.4 < 0.5 + 3*3
+    assert evaluate("Service", {**node, "mem_slope": 40.0}, c)["memory"] is not None

@@ -80,10 +80,11 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
                 out["latency"] = Breach("latency", lat, thr, bl, dev)
 
     if "memory" in out:
-        slope = _f(p, "mem_slope")
-        if slope is not None and slope > c["mem_slope_mb_per_min"]:
-            out["memory"] = Breach("memory", slope, c["mem_slope_mb_per_min"], _f(p, "bl_mem_slope", 0.0),
-                                   _f(p, "bl_mem_slope_dev", 0.0))
+        slope, bl, dev = _f(p, "mem_slope"), _f(p, "bl_mem_slope", 0.0) or 0.0, _f(p, "bl_mem_slope_dev", 0.0) or 0.0
+        # absolute floor, and outside the runtime's normal sawtooth (GC'd heaps swing by several MB/min)
+        thr = max(c["mem_slope_mb_per_min"], bl + c.get("mem_sigma", 0.0) * dev)
+        if slope is not None and slope > thr:
+            out["memory"] = Breach("memory", slope, thr, bl, dev)
 
     if "cpu" in out:
         cpu = _f(p, "cpu_pct")
