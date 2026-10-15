@@ -24,8 +24,8 @@ These are NOT acceptance checks — the boxes below still need the real demo.
 | M7 | UI v1 | done | [x] M5–M6 flow visible and clickable |
 | M8 | MCP, autopilot, LLM agent, Step trail | done | [~] Claude Desktop answers "who owns payment?"; agent JSON produced; trail visible |
 | M9 | Extras: memory, predict, safety, invisible + AI faults | done | [x] PRD acceptance lines (PRD not in repo yet) |
-| M10 | Chaos runner, baselines, scorecard, recorder, golden tests | done | [ ] `make chaos N=15` writes SCORECARD.md; `make scenario-test` green |
-| M11 | Replay deployment, docs, README | done | [ ] fresh VM: one command → public URL in REPLAY |
+| M10 | Chaos runner, baselines, scorecard, recorder, golden tests | done | [~] `make chaos N=15` writes SCORECARD.md; `make scenario-test` green |
+| M11 | Replay deployment, docs, README | done | [x] fresh VM: one command → public URL in REPLAY |
 
 ## VERIFY items (CLAUDE.md §5) — resolved 2026-10-15 against the live demo
 - [x] collector exporter type name and `encoding: json` → `otlp_http/<name>` + `encoding: json` accepted (collector-contrib 0.160.0); bodies are gzip
@@ -189,3 +189,19 @@ during sleep were discarded and repeated).
 - **Invisible + AI faults (R10):** CPU (adHighCpu), GC pressure (adManualGc), Kafka lag + vanished consumer
   (kafkaConsumerDead), slow consumer (kafkaQueueProblems), memory leak (emailMemoryLeak 1000x), runaway agent and slow
   LLM — all detected and ranked top-1 (see the sweep table). Known miss: lock contention ranks the DB first.
+
+### M10 — recordings and golden tests
+6 scenarios recorded from the live demo with `scripts/record_scenario.py` (4 min healthy → flip → 3 min broken →
+revert → 2 min recovery; OTLP compacted to the attributes the ingest reads, ~4 MB each): paymentFailure,
+paymentUnreachable, intlShippingSlowdown (latency), kafkaConsumerDead (invisible), aiRunawayAgent (AI), adManualGc.
+`make scenario-test` → **6 passed** (top-1 = catalogue truth, and the winner has the flag change linked).
+The first recordings lacked a flag-file snapshot at start (replay then saw no change); `scripts/backfill_flag_snapshot.py`
+prepended the healthy flag state (documented in the script) and the recorder now writes the snapshot itself.
+
+### M11 — public replay deployment
+- AWS t4g.small, `scripts/deploy_aws.sh` = `git clone` + `docker compose -f infra/docker-compose.replay.yml up -d --build`
+  on a fresh Amazon Linux host → **http://3.234.90.242/** (REPLAY badge, scenario picker, visitor hints).
+- On start the healthy segment is fast-forwarded on a virtual clock (baselines warm in < 10 s), the fault plays live:
+  INC-0001 "4 alerts → 1 incident", payment 0.90, `paymentFailure off → 100%`, checkout journey −70 %.
+- Clicked **Approve** on the flag revert (simulated) → player jumped to the recorded recovery → `verifying` → `resolved`.
+- `POST /api/admin/reset` → fresh `rc_replay` graph, warm-up, incident again ~30 s later.
