@@ -54,10 +54,14 @@ export default function GraphView({ graph, overlays }: { graph: Graph | null; ov
     const edges = graph.edges.filter((e) => ids.has(e.source) && ids.has(e.target));
     const key = graph.nodes.map((n) => n.id).sort().join() + "|" +
       edges.filter((e) => e.type !== "BLAMES").map((e) => `${e.source}>${e.target}`).sort().join();
+    // every update rebuilds the elements; keep each node where it was so only topology changes re-layout
+    const pos: Record<string, cytoscape.Position> = {};
+    c.nodes().forEach((n) => { pos[n.id()] = { ...n.position() }; });
     c.batch(() => {
       c.elements().remove();
       c.add(graph.nodes.map((n) => ({
         group: "nodes" as const,
+        position: pos[n.id] ? { ...pos[n.id] } : undefined,
         data: { id: n.id, label: n.id.replace(/^(queue|db|cache):/, "") },
         classes: [...n.labels, n.labels.includes("Anomalous") ? "anomalous" : ""].join(" "),
       })));

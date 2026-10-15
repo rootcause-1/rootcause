@@ -124,7 +124,9 @@ class Detector:
     async def run(self, now_ms: int, incidents_open: bool) -> dict[str, Any]:
         nodes = await self.db.run("read_detect_inputs")
         if self.started_ms is None and any((n["props"] or {}).get("rps") for n in nodes):
-            self.started_ms = now_ms
+            # baselines live on the graph: after a restart with learned baselines, keep using them
+            learned = any((n["props"] or {}).get("bl_rps") is not None for n in nodes)
+            self.started_ms = now_ms - (int(self.c["learn_seconds"] * 1000) if learned else 0)
         learning = self.learning_left_ms(now_ms) > 0
         firing = {(a["target"], a["kind"]): a for a in await self.db.run("open_alerts")}
 

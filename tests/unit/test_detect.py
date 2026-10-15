@@ -90,3 +90,17 @@ def test_latency_and_lag_need_enough_data():
     q = {"produce_rate": 0.02, "consume_rate": 0.04, "lag": 1.0, "lag_slope": 2.0}
     assert evaluate("Queue", q, c)["lag"] is None
     assert evaluate("Queue", {**q, "lag": 6.0}, c)["lag"] is not None
+
+
+async def test_detector_reuses_graph_baselines_after_restart():
+    from rootcause.detect.rules import Detector
+
+    class FakeDB:  # unit-level stand-in for read_detect_inputs/open_alerts only; graph behaviour is in tests/graph
+        async def run(self, name, **kw):
+            if name == "read_detect_inputs":
+                return [{"id": "payment", "labels": ["Service"], "props": {"rps": 1.0, "bl_rps": 1.0}}]
+            return []
+
+    d = Detector(FakeDB(), {**C, "learn_seconds": 180, "ewma_alpha": 0.1, "hold_ticks": 2, "resolve_ticks": 3}, set())
+    out = await d.run(1_000_000, incidents_open=False)
+    assert out["learning_left_ms"] == 0
