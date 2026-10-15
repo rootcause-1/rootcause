@@ -11,6 +11,12 @@ fi
 cp infra/otelcol-config-extras.yml "$DEMO/src/otel-collector/otelcol-config-extras.yml"
 echo "installed collector override -> $DEMO/src/otel-collector/otelcol-config-extras.yml"
 
+# The demo's default 5 load-generator users give checkout only ~2 requests/min: too few for 60 s detection
+# windows. Raise LOCUST_USERS (the demo's own knob) in .env.override; mostly cheap HTTP users (browser weight 1/10).
+if ! grep -q '^LOCUST_USERS=' "$DEMO/.env.override" 2>/dev/null; then
+  printf '\n# RootCause: enough checkout traffic for 60 s detection windows\nLOCUST_USERS=12\n' >> "$DEMO/.env.override"
+fi
+
 # our API must exist on the demo network before the collector exports to it; the exporter retries until then
 (cd "$DEMO" && make start-agentic)
 
