@@ -155,3 +155,10 @@ def test_gc_pressure_rule():
     c = {**C, "gc_min_frac": 0.05}
     assert evaluate("Service", {"gc_frac": 0.003, "bl_gc_frac": 0.001}, c)["gc"] is None
     assert evaluate("Service", {"gc_frac": 0.30, "bl_gc_frac": 0.001, "bl_gc_frac_dev": 0.001}, c)["gc"].value == 0.30
+
+
+def test_one_failed_request_is_not_an_incident():
+    c = {**C, "error_min_count": 2}
+    p = {"rps": 0.12, "server_spans": 7, "err_rate": 1 / 7, "bl_err_rate": 0.0}
+    assert evaluate("Service", p, c)["error_rate"] is None
+    assert evaluate("Service", {**p, "err_rate": 2 / 7}, c)["error_rate"] is not None

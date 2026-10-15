@@ -154,7 +154,13 @@ class ChaosRunner:
         top1, top3 = verdict in ok, any(t in ranked[:3] for t in ok)
         miss = None
         if not incident_id:
-            miss = "no incident with a verdict within 180 s (fault not visible?)"
+            earlier = [i for i in await facts.list_incidents(self.db, "all")
+                       if int(i.get("created_ts") or 0) < t0 and any(t in (i.get("members") or []) for t in ok)]
+            if earlier:
+                lead = (t0 - int(earlier[-1].get("created_ts") or t0)) / 1000
+                miss = f"the fault joined incident {earlier[-1]['id']}, opened by noise {lead:.1f} s before the flip"
+            else:
+                miss = "no incident with a verdict within 180 s (fault not visible?)"
         elif not top1:
             pos = [ranked.index(t) + 1 for t in ok if t in ranked]
             miss = f"truth ranked {min(pos)} (top-1 was {verdict})" if pos else f"truth not among candidates (top-1 was {verdict})"

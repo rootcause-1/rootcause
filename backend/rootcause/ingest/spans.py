@@ -44,6 +44,7 @@ class IngestConfig:
     non_candidates: frozenset[str] = frozenset()
     op_min_spans: int = 2              # routes with fewer server spans in the window are too noisy to rate
     op_min_latency_spans: int = 5      # ... and too few to take a p95 of
+    op_min_failures: int = 2           # one failed request on a route is not a failing route
 
 
 @dataclass
@@ -297,7 +298,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
     op_worst: dict[str, float] = defaultdict(float)
     op_slowest: dict[str, float] = {}
     for (svc, _op), n in op_n.items():
-        if n >= cfg.op_min_spans:
+        if n >= cfg.op_min_spans and op_err[(svc, _op)] >= cfg.op_min_failures:
             op_worst[svc] = max(op_worst[svc], op_err[(svc, _op)] / n)
         if n >= cfg.op_min_latency_spans:  # likewise the slowest route's p95 (one slow route in a busy service)
             op_slowest[svc] = max(op_slowest.get(svc, 0.0), p95(op_lat[(svc, _op)]) or 0.0)

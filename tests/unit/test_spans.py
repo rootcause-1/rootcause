@@ -182,10 +182,12 @@ def test_4xx_with_failing_handler_counts_as_failure():
         sp("t", "3", "", "frontend", SERVER, **{"http.route": "/api/checkout", "http.status_code": "404"}),
         sp("t", "4", "", "frontend", SERVER, **{"http.route": "/api/cart"}),
         sp("t", "5", "", "frontend", SERVER, **{"http.route": "/api/cart"}),
+        sp("t", "6", "", "frontend", SERVER, **{"http.route": "/api/checkout", "http.status_code": "422"}),
+        sp("t", "7", "6", "frontend", INTERNAL, err=True),
     ])
     f = {x["id"]: x for x in st.services}["frontend"]
-    assert f["err_rate"] == 0.25         # 1 of 4 server spans: only the 422 with a failing handler
-    assert f["op_err_rate"] == 0.5       # /api/checkout: 1 of 2
+    assert f["err_rate"] == 0.4          # 2 of 5 server spans: the 422s with a failing handler (not the 404)
+    assert f["op_err_rate"] == 2 / 3     # /api/checkout: 2 of 3
 
 
 def test_slowest_route_p95():

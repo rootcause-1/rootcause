@@ -65,6 +65,7 @@ detect:
   min_rps: 0.02                              # ignore error/latency rules on nodes with less traffic (real demo: checkout/payment run at ~0.03 rps)
   error_sigma: 3.0
   error_floor: 0.05
+  error_min_count: 2                         # at least 2 failed requests in the window
   latency_factor: 2.0
   latency_sigma: 3.0                         # and above baseline + 3 x its mean deviation
   latency_min_ms: 50

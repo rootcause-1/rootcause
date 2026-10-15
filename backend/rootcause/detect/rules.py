@@ -57,10 +57,14 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
                 out[kind] = NO_DATA
 
     if "error_rate" in out and busy:
-        # service-wide error rate, then the worst single route (op_err_rate), each against its own baseline
+        # service-wide error rate, then the worst single route (op_err_rate), each against its own baseline;
+        # one failed request is not an incident (agent: 1 VCR mismatch in 7 runs = 14 %)
+        spans = _f(p, "server_spans")
         for metric in ("err_rate", "op_err_rate"):
             err, bl, dev = _f(p, metric), _f(p, f"bl_{metric}", 0.0), _f(p, f"bl_{metric}_dev", 0.0)
             if err is None:
+                continue
+            if metric == "err_rate" and spans is not None and err * spans < c.get("error_min_count", 0) - 1e-9:
                 continue
             thr = max(bl + c["error_sigma"] * dev, bl + c["error_floor"])
             if err > thr:
