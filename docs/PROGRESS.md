@@ -21,8 +21,8 @@ These are NOT acceptance checks — the boxes below still need the real demo.
 | M4 | Baselines, rules, `:Anomalous` | done | [x] `paymentFailure` → alerts on payment/checkout/frontend within 30 s; off → resolved |
 | M5 | BLAMES, WCC, ranking, edge causes, changes, impact, evidence | done | [x] `paymentFailure` → 1 incident, top-1 payment, change + checkout journey; `paymentUnreachable` → `edge:checkout->payment` |
 | M6 | Actions, verify, report | done | [x] approve revert → incident resolved + report |
-| M7 | UI v1 | done (builds) | [ ] M5–M6 flow visible and clickable |
-| M8 | MCP, autopilot, LLM agent, Step trail | done | [ ] Claude Desktop answers "who owns payment?"; agent JSON produced; trail visible |
+| M7 | UI v1 | done | [x] M5–M6 flow visible and clickable |
+| M8 | MCP, autopilot, LLM agent, Step trail | done | [~] Claude Desktop answers "who owns payment?"; agent JSON produced; trail visible |
 | M9 | Extras: memory, predict, safety, invisible + AI faults | done | [ ] PRD acceptance lines (PRD not in repo yet) |
 | M10 | Chaos runner, baselines, scorecard, recorder, golden tests | done | [ ] `make chaos N=15` writes SCORECARD.md; `make scenario-test` green |
 | M11 | Replay deployment, docs, README | done | [ ] fresh VM: one command → public URL in REPLAY |
@@ -123,3 +123,22 @@ approving ACT-0c13fb6a (flag_revert paymentFailure, risk low)
   general signal: ≥ 50 % of an edge's calls failing with **no answering server span** (`unanswered_share`).
 - A stale proposal (revert a flag that was already back to its healthy variant) exposed that old changes counted as
   causes. Fixed generally: superseded changes and changes back to the learned-healthy variant are not causes.
+
+### M7 — UI (localhost:8088), driven by clicking in a browser
+- `paymentFailure` → incident card "4 alerts → 1 incident", ranked bars (payment 1.00 incl. memory of a past
+  incident), what-changed `paymentFailure off → 100%`, journey impact checkout −100%, similar incident (strong
+  match), evidence path drawn on the live graph (`docs/img/ui-incident.jpg`).
+- Clicked **Approve** on "flag revert paymentFailure (risk low)" → `status: executed` → `status: verified`;
+  INC-0003 resolved (`ttr_ms` 140954); Reports tab shows `INC-0003 — root cause: payment`, confidence 1.00.
+- Fixed on the way: nodes collapsing to one point on SSE updates (positions now carried over), stale cached
+  `index.html` (nginx `no-cache`), isolated infra nodes hidden.
+
+### M8 — MCP + agent
+- `scripts/mcp_smoke.py` (streamable HTTP :8811) and `--stdio` (what Claude Desktop launches): 16 tools listed;
+  `who_owns(payment)` → payments-team, on call Asha Rao; `list_incidents`, `blast_radius(payment)` work.
+- Autopilot agent JSON on every incident (root_cause, confidence, evidence_path, change, impact,
+  proposed_actions, narrative) and its Step trail is visible in the UI's Agent trail.
+- **Open:** the final check in Claude Desktop itself (a human pastes the README snippet into
+  `claude_desktop_config.json`) and LLM agent mode (`RC_AGENT_MODE=llm` needs `ANTHROPIC_API_KEY`).
+- Detector fix found via the UI: checkout/payment get ~2 requests/min, so some 60 s windows have no payment spans;
+  those were treated as healthy and resolved the alert. Now a too-quiet window is `no_data` and holds state.
