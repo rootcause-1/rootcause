@@ -23,7 +23,7 @@ from typing import Any
 
 from rootcause import facts
 from rootcause.actions import containers, flagd, pager, report, verify
-from rootcause.engine import memory, safety
+from rootcause.engine import changes, memory, safety
 from rootcause.graph.client import GraphDB
 from rootcause.settings import Settings
 from rootcause.util import dumps, new_id, now_ms
@@ -95,6 +95,19 @@ class ActionService:
                                   "params": {"variant": ch["from_variant"], "change": ch["id"]},
                                   "reason": f"{ch['target']} changed {ch['from_variant']} → {ch['to']} right before "
                                             f"onset and affects {root}"})
+        # live changes that hit another top-3 suspect (e.g. the root is a slow DB, the change is on its client)
+        seen_changes = {ch["id"] for ch in inc["changes"]}
+        weak = float(self.s.c("engine", "change_weak_min", default=30))
+        for h in inc["hypotheses"][1:3]:
+            target = h["target"]
+            node = target.split("->", 1)[1] if target.startswith("edge:") else target
+            for ch in await changes.for_node(db, node, int(inc.get("onset_ts") or now_ms()), weak):
+                if ch["kind"] == "flag" and ch.get("from_variant") is not None and ch["change"] not in seen_changes:
+                    seen_changes.add(ch["change"])
+                    proposals.append({"kind": "flag_revert", "target": ch["flag"],
+                                      "params": {"variant": ch["from_variant"], "change": ch["change"]},
+                                      "reason": f"{ch['flag']} changed {ch['from_variant']} → {ch['to']} right before "
+                                                f"onset and affects {node} (suspect #{h['rank']})"})
         if not root_service.startswith(("queue:", "db:", "cache:")):
             proposals.append({"kind": "restart", "target": root_service, "params": {},
                               "reason": f"{root_service} is the ranked root cause"})

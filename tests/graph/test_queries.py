@@ -194,3 +194,23 @@ async def test_superseded_and_restoring_changes_are_not_causes(db):
                  ts=ONSET - 60_000, actor="unknown")
     live = await db.run("recent_changes_for", node_id="payment", onset=ONSET, window_ms=1_800_000)
     assert live == []  # CHG-1 superseded, CHG-2 restored the baseline variant
+
+
+async def test_propose_reverts_change_on_a_runner_up_suspect(db):
+    # root ranked on a node without a change (like a slow DB); the live flag change hits suspect #2
+    from rootcause.actions.service import ActionService
+
+    await fixtures.build(db)
+    await db.run("set_flag_baselines", flags=[{"id": "paymentFailure", "variant": "off"}])
+    await db.run("create_flag_change", id="CHG-9", flag="paymentFailure", from_variant="off", to="100%",
+                 ts=ONSET - 60_000, actor="unknown")
+    await db.run("create_incident", id="INC-0009", now=NOW, onset=ONSET, members=FAILING)
+    sig = {"depth": 1.0, "self": 1.0, "pagerank": 1.0, "change": 0.0, "memory": 0.0}
+    await db.run("write_hypotheses", id="INC-0009", now=NOW, hyps=[
+        {"id": "INC-0009:H1", "target": "checkout", "score": 0.8, "rank": 1, **sig},
+        {"id": "INC-0009:H2", "target": "payment", "score": 0.7, "rank": 2, **sig}])
+    await db.run("set_root_cause", id="INC-0009", node="checkout", edge=None, score=0.8, target="checkout")
+    out = await ActionService(db, get_settings()).propose("INC-0009")
+    reverts = [a for a in out["actions"] if a["kind"] == "flag_revert"]
+    assert [a["target"] for a in reverts] == ["paymentFailure"] and reverts[0]["risk"] == "low"
+    assert "suspect #2" in reverts[0]["reason"]
