@@ -186,3 +186,12 @@ def test_4xx_with_failing_handler_counts_as_failure():
     f = {x["id"]: x for x in st.services}["frontend"]
     assert f["err_rate"] == 0.25         # 1 of 4 server spans: only the 422 with a failing handler
     assert f["op_err_rate"] == 0.5       # /api/checkout: 1 of 2
+
+
+def test_slowest_route_p95():
+    spans = [sp("t", str(i), "", "shipping", SERVER, dur=2, **{"http.route": "/get-quote"}) for i in range(20)]
+    spans += [sp("t", f"s{i}", "", "shipping", SERVER, dur=3, **{"http.route": "/ship-order"}) for i in range(9)]
+    spans += [sp("t", "slow", "", "shipping", SERVER, dur=5000, **{"http.route": "/ship-order"})]
+    st = run(spans)
+    shipping = {x["id"]: x for x in st.services}["shipping"]
+    assert shipping["p95_ms"] < 10 and shipping["op_p95_ms"] == 5000

@@ -68,16 +68,22 @@ def evaluate(label: str, p: dict[str, Any], c: dict[str, Any]) -> dict[str, Brea
                 break
 
     if "latency" in out:
-        lat, bl, dev = _f(p, "p95_ms"), _f(p, "bl_p95_ms"), _f(p, "bl_p95_ms_dev", 0.0)
         samples = _f(p, "server_spans")  # None for datastores (no per-window count): rule applies
         enough = samples is None or samples >= c.get("latency_min_samples", 0)
         if busy and not enough:
             out["latency"] = NO_DATA
-        if lat is not None and bl and busy and enough:
-            # 2x baseline, but also outside the service's normal spread (agent/LLM latencies are naturally spiky)
-            thr = max(c["latency_factor"] * bl, bl + c.get("latency_sigma", 0.0) * (dev or 0.0), c["latency_min_ms"])
-            if lat > thr:
-                out["latency"] = Breach("latency", lat, thr, bl, dev)
+        if busy and enough:
+            # service-wide p95, then the slowest route's p95 (op_p95_ms), each against its own baseline:
+            # 2x baseline, outside the normal spread (agent/LLM latencies are spiky) and above an absolute floor
+            for metric in ("p95_ms", "op_p95_ms"):
+                lat, bl, dev = _f(p, metric), _f(p, f"bl_{metric}"), _f(p, f"bl_{metric}_dev", 0.0)
+                if lat is None or not bl:
+                    continue
+                thr = max(c["latency_factor"] * bl, bl + c.get("latency_sigma", 0.0) * (dev or 0.0),
+                          c["latency_min_ms"])
+                if lat > thr:
+                    out["latency"] = Breach("latency", lat, thr, bl, dev)
+                    break
 
     if "memory" in out:
         slope, bl, dev = _f(p, "mem_slope"), _f(p, "bl_mem_slope", 0.0) or 0.0, _f(p, "bl_mem_slope_dev", 0.0) or 0.0

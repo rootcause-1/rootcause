@@ -41,6 +41,7 @@ class IngestConfig:
     agent_workflow_span: str = "astronomy_shop_agent_workflow"
     non_candidates: frozenset[str] = frozenset()
     op_min_spans: int = 2              # routes with fewer server spans in the window are too noisy to rate
+    op_min_latency_spans: int = 5      # ... and too few to take a p95 of
 
 
 @dataclass
@@ -167,6 +168,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
     svc_lat: dict[str, list[float]] = defaultdict(list)
     op_n: Counter[tuple[str, str]] = Counter()
     op_err: Counter[tuple[str, str]] = Counter()
+    op_lat: dict[tuple[str, str], list[float]] = defaultdict(list)
     svc_any: set[str] = set()
 
     call_n: Counter[tuple[str, str]] = Counter()
@@ -216,6 +218,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
                 svc_lat[s.service].append(s.duration_ms)
                 op = (s.service, _route(s))
                 op_n[op] += 1
+                op_lat[op].append(s.duration_ms)
                 if failed:
                     svc_server_err[s.service] += 1
                     op_err[op] += 1
@@ -290,9 +293,12 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
     # worst endpoint per service: a failing low-traffic route (e.g. /api/checkout) is invisible in the service-wide
     # error rate of a busy frontend, so the detector also watches the max per-route error rate
     op_worst: dict[str, float] = defaultdict(float)
+    op_slowest: dict[str, float] = {}
     for (svc, _op), n in op_n.items():
         if n >= cfg.op_min_spans:
             op_worst[svc] = max(op_worst[svc], op_err[(svc, _op)] / n)
+        if n >= cfg.op_min_latency_spans:  # likewise the slowest route's p95 (one slow route in a busy service)
+            op_slowest[svc] = max(op_slowest.get(svc, 0.0), p95(op_lat[(svc, _op)]) or 0.0)
 
     st = WindowStats(span_count=count)
     st.flag_affects = [{"flag": f, "svc": svc} for f, svc in sorted(flag_evals)]
@@ -303,6 +309,7 @@ def aggregate_traces(traces: dict[str, list[Span]], lo: int, hi: int, cfg: Inges
             "rps": n / secs,
             "err_rate": (svc_server_err[svc] / n) if n else 0.0,
             "op_err_rate": op_worst.get(svc, 0.0),
+            "op_p95_ms": op_slowest.get(svc),
             "self_err_rate": min(1.0, svc_self_err[svc] / n) if n else (1.0 if svc_self_err[svc] else 0.0),
             "p95_ms": p95(svc_lat[svc]),
             "server_spans": n,

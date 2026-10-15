@@ -143,3 +143,9 @@ def test_memory_slope_respects_normal_sawtooth():
     node = {"mem_slope": 7.4, "bl_mem_slope": 0.5, "bl_mem_slope_dev": 3.0}
     assert evaluate("Service", node, c)["memory"] is None            # 7.4 < 0.5 + 3*3
     assert evaluate("Service", {**node, "mem_slope": 40.0}, c)["memory"] is not None
+
+
+def test_slowest_route_latency_fires_when_service_p95_is_diluted():
+    # shipping: 1 in 28 requests (international ship-order) delayed 5 s -> service p95 unchanged, route p95 5 s
+    p = {"rps": 0.5, "server_spans": 28, "p95_ms": 3.0, "bl_p95_ms": 2.0, "op_p95_ms": 5004.0, "bl_op_p95_ms": 3.0}
+    assert evaluate("Service", p, C)["latency"].value == 5004.0
