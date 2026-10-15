@@ -26,7 +26,9 @@ over on a fresh graph. Pick another scenario from the header, or reset: `POST /a
 | Network | Elastic IP `3.234.90.242`, security group `rootcause-demo` (80 open, 22 from the team's IP only) |
 | Cost | ~$12/month while running (tagged `project=rootcause`) |
 
-Update after pushing to `main`: `scripts/deploy_aws.sh` (pulls `main` on the host and rebuilds the replay stack).
+Updates are pull-based: a systemd timer on the host (`infra/autodeploy/`, installed once with
+`bash infra/autodeploy/install.sh`) checks `origin/main` every 2 minutes and rebuilds the replay stack when it moved,
+so **pushing to `main` deploys**. `scripts/deploy_aws.sh` does the same immediately over SSH.
 
 Host bootstrap (EC2 user-data):
 
