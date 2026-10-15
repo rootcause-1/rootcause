@@ -59,7 +59,7 @@ detect:
   learn_seconds: 180
   ewma_alpha: 0.1
   hold_ticks: 2                              # a rule must hold this many consecutive ticks
-  hold_ticks_by_kind: {memory: 24, lag: 6, cpu: 6}   # memory slope 2 min, lag growth 30 s (CLAUDE.md §7.4), cpu 30 s; 5 s ticks
+  hold_ticks_by_kind: {memory: 12, lag: 6, cpu: 6}   # memory 60 s on top of the 2-min slope window (= 2 min of growth), lag 30 s, cpu 30 s; 5 s ticks
   resolve_ticks: 3                           # healthy ticks before an alert resolves
   no_data_resolve_ticks: 24                  # a window too quiet to judge holds alert state; 2 min of silence counts as healthy
   min_rps: 0.02                              # ignore error/latency rules on nodes with less traffic (real demo: checkout/payment run at ~0.03 rps)
