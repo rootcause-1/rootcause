@@ -205,3 +205,14 @@ prepended the healthy flag state (documented in the script) and the recorder now
   INC-0001 "4 alerts → 1 incident", payment 0.90, `paymentFailure off → 100%`, checkout journey −70 %.
 - Clicked **Approve** on the flag revert (simulated) → player jumped to the recorded recovery → `verifying` → `resolved`.
 - `POST /api/admin/reset` → fresh `rc_replay` graph, warm-up, incident again ~30 s later.
+
+## M10 — blind chaos batches (`make chaos N=15`)
+All batches: the harness flips a random catalogue flag (seeded RNG), never tells the engine, waits ≤ 180 s for a
+verdict + 45 s settle, scores against the catalogue truth; baselines are scored on the same alert snapshot; a run with
+no incident is a miss for every method. Scorecards are generated (never typed); archives in `docs/scorecards/`.
+
+| batch | engine | RootCause top-1 / top-3 | best baseline top-1 | notes |
+|---|---|---|---|---|
+| 1 `20261015_194536` | after the flag sweep | **80 % / 87 %** (median 54 s) | graph_off 73 %, first_alert 47 %, loudest 33 % | 2 of 3 misses were a harness race: a noise alert opened an incident seconds before the flip and the fault's alerts joined it. Fixed: ≥ 2 failed requests per error alert, latency floor 100 ms, runner scores the incident the fault joined. |
+| 2 `20261015_205332` | + those fixes | aborted after 5 runs | – | regression found: the new latency guards hid emailMemoryLeak's latency, the 2-min memory hold exceeded the 180 s window, and the fast EWMA had absorbed earlier undetected leaks into the baseline. Fixed: memory hold 60 s on top of the 2-min slope, EWMA α 0.01 after learning, sample gate only on the service-wide p95. |
+| 3 | final | see `docs/SCORECARD.md` | | |
