@@ -63,6 +63,22 @@ histories for slopes, SSE queues, and the replay player's cursor.
 4. The recorder tees every input; the player feeds recordings through the same `Pipeline.feed()` time-shifted.
 5. Golden tests replay each recording on a virtual clock and assert the top-1 matches the catalogue truth.
 
+### What the real demo taught us (15 Oct, live runs)
+1. **Telemetry shape**: the collector gzips OTLP; gRPC clients carry `rpc.method` (not `rpc.service`), so callees are
+   named from it — that is how `checkout -> "badAddress"` still resolves to `payment`; the load generator and the
+   browser are traced, so journeys start at the first shop span under them; flag evaluations arrive as
+   `feature_flag.evaluation` span events and become `FeatureFlag-AFFECTS->Service` edges.
+2. **Failures hide behind 4xx and busy services**: the frontend answers a failed checkout with HTTP 422 plus an
+   exception on an inner span, and checkout is ~0.1 % of the frontend's traffic. A request counts as failed if its own
+   handler errored, and the detector also watches the worst single route (`op_err_rate`) against its own baseline.
+3. **Sparse traffic is not health**: a 60 s window with too few requests is `no_data`; it holds alert state instead of
+   resolving it (2 min of silence does count as healthy). Latency needs ≥ 5 samples, Kafka lag ≥ 3 messages.
+4. **Connections**: if ≥ 50 % of an edge's failing calls were never answered by any server span, the connection is
+   the cause (`edge:A->B`) — no need to wait for the callee's traffic to vanish from the window.
+5. **Changes**: only *live* changes count as causes — not superseded by a later change to the same flag, not a return
+   to the variant the flag had while baselines were learned, not made by RootCause itself. The diagnosis is frozen
+   while an approved fix is being verified, and the report renders the agent's verdict snapshot.
+
 ## Deliberate deviations from CLAUDE.md (flagged for the team)
 - **LLM temperature**: the spec asks for temperature 0, but `claude-sonnet-5-5` rejects non-default sampling
   parameters (HTTP 400). The agent pins `output_config.effort = "medium"` instead and enables server-side refusal
