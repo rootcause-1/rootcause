@@ -23,7 +23,7 @@ These are NOT acceptance checks — the boxes below still need the real demo.
 | M6 | Actions, verify, report | done | [x] approve revert → incident resolved + report |
 | M7 | UI v1 | done | [x] M5–M6 flow visible and clickable |
 | M8 | MCP, autopilot, LLM agent, Step trail | done | [~] Claude Desktop answers "who owns payment?"; agent JSON produced; trail visible |
-| M9 | Extras: memory, predict, safety, invisible + AI faults | done | [ ] PRD acceptance lines (PRD not in repo yet) |
+| M9 | Extras: memory, predict, safety, invisible + AI faults | done | [x] PRD acceptance lines (PRD not in repo yet) |
 | M10 | Chaos runner, baselines, scorecard, recorder, golden tests | done | [ ] `make chaos N=15` writes SCORECARD.md; `make scenario-test` green |
 | M11 | Replay deployment, docs, README | done | [ ] fresh VM: one command → public URL in REPLAY |
 
@@ -175,3 +175,17 @@ Other things the sweep exposed and fixed: noise from tiny samples (latency p95 n
 grow ≥ 3 messages for 30 s, CPU must hold 30 s, latency must also exceed baseline + 3× deviation), the demo's default
 5 load-generator users being too few (LOCUST_USERS=12), and the Mac sleeping mid-run (pauses the Docker VM; runs
 during sleep were discarded and repeated).
+
+### M9 — extras (acceptance lines from docs/PRD.md R7–R10)
+- **Memory (R7):** a repeat of `paymentFailure` showed *Similar past incidents: INC-0001 1.00 strong match* in the UI,
+  memory signal 1.0 on payment, and its fix (`flag_revert paymentFailure`) proposed first (screenshot in M7 run).
+- **Predict-then-prove (R8):** `POST /api/predict {"node_id": "shipping"}` → PRD-0b48c798 predicted
+  {shipping, checkout, frontend, frontend-proxy}; during the recorded `intlShippingSlowdown` break,
+  `POST /api/predictions/PRD-0b48c798/score` → actual anomalous {frontend, shipping}: **recall 1.0, precision 0.5**
+  (checkout/proxy had not alerted yet at that moment). Journey prediction now only names journeys that critically
+  require the broken node (it used to predict every journey through the frontend).
+- **Safety (R9):** every proposal carries risk + affected services/journeys; `restart payment` is `high` (top-20 %
+  betweenness) and the UI requires typing `RESTART payment`; flag reverts are `low`; paging is `none`.
+- **Invisible + AI faults (R10):** CPU (adHighCpu), GC pressure (adManualGc), Kafka lag + vanished consumer
+  (kafkaConsumerDead), slow consumer (kafkaQueueProblems), memory leak (emailMemoryLeak 1000x), runaway agent and slow
+  LLM — all detected and ranked top-1 (see the sweep table). Known miss: lock contention ranks the DB first.
