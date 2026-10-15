@@ -8,8 +8,8 @@
 - {flag: cartFailure, variant: "100%", off: "off", truth: cart, class: errors}
 - {flag: adFailure, variant: "on", off: "off", truth: ad, class: errors}
 - {flag: productCatalogFailure, variant: "on", off: "off", truth: product-catalog, class: errors}
-- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}
-- {flag: imageSlowLoad, variant: "5sec", off: "off", truth: image-provider, class: latency}   # VERIFY truth: docs say the delay is injected by Envoy (frontend-proxy) fault injection on image requests, so the engine may (correctly) point at frontend-proxy or the edge frontend-proxy->image-provider
+- {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}   # product-catalog's own loop takes an ACCESS EXCLUSIVE lock on catalog tables (product-catalog/main.go triggerLockContention); the slow DB calls are a symptom
+- {flag: imageSlowLoad, variant: "5sec", off: "off", truth: frontend-proxy, class: latency}   # truth from demo source (decided before the sweep): the browser sends `x-envoy-fault-delay-request` (frontend/components/ProductCard.tsx) and Envoy in frontend-proxy injects the delay; image-provider itself is not slow
 - {flag: intlShippingSlowdown, variant: "5sec", off: "off", truth: shipping, class: latency}
 - {flag: adHighCpu, variant: "on", off: "off", truth: ad, class: invisible}
 - {flag: adManualGc, variant: "on", off: "off", truth: ad, class: latency}
