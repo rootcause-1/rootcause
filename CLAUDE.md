@@ -538,26 +538,32 @@ Before M10, break **every** catalogue flag once by hand, write what you observe 
 
 ---
 
-## 16. Current state and how to continue (updated 15 Oct, ~4 PM IST)
+## 16. Current state and how to continue (updated 16 Oct, ~2 AM IST)
 
-**State:** every milestone M0–M11 is coded (by Shambhvi + Claude Code). On a machine with FalkorDB (no OTel demo):
-- `make lint` clean; `pytest tests/unit tests/graph` → **130 passed, 1 skipped** (all 74 `.cypher` files run against a real FalkorDB 4.18.3).
-- End-to-end smoke with `scripts/synthetic_traffic.py` (synthetic OTLP spans, **dev only**): healthy → no incidents; payment errors → one incident, top-1 `payment`, evidence path `frontend-proxy → frontend → checkout → payment`, checkout journey impact, owner + proposals; payment server spans vanish → top-1 `edge:checkout->payment`.
-- **Nothing has run against the real OpenTelemetry Demo yet.** No acceptance check in `docs/PROGRESS.md` is ticked.
+**State:** running against the real OpenTelemetry Demo (agentic mode, `LOCUST_USERS=12`) on Yash's Mac.
+- `make lint test` → 157 passed; `make scenario-test` → 6/6 golden replays (top-1 = truth, change linked).
+- Acceptance M0–M7 and M9–M11 pass live; M8 verified with an MCP client (HTTP + stdio) — the Claude Desktop check and
+  the LLM agent mode (needs `ANTHROPIC_API_KEY`) are the only open items. Evidence: `docs/PROGRESS.md`.
+- Every catalogue flag was broken by hand: 15/16 top-1 after general fixes (lock contention ranks the DB first,
+  truth #2). Observations are comments in `chaos/catalogue.yaml`.
+- Recordings: 6 scenarios in `replay/` (~4 MB each). Public replay site: http://3.234.90.242/ (AWS, `docs/DEPLOY.md`);
+  **pushing to `main` redeploys it** (pull-based timer on the host).
+- `make chaos N=15` was started 16 Oct ~01:15 IST; `docs/SCORECARD.md` is generated from it.
 
-**Fixed in this review (don't undo):** `evidence_path` shortestPath form; WCC filter-drop bug (fresh graph produced fake incidents of teams/runbooks); the agent now re-investigates (max 3×, before any approval) when the engine's top cause changes — needed because "traffic vanished" edge causes only appear once the 60 s window rolls over; catalogue truths for `kafkaConsumerDead` / `kafkaQueueProblems` → `fraud-detection` (per OTel docs), all 16 flag names confirmed against the OTel docs (variants still VERIFY).
+**Verified facts you must not undo** (each has a test): OTLP bodies are gzip; peers come from `rpc.method`; journeys
+start at the first shop span under the traced load generator/browser; flag evaluations are span events →
+`AFFECTS`; targeting flags are switched/watched via `targeting.if[1]` (like the demo's flag UI); a request failed if
+its own handler errored even on 4xx; detector watches the worst route's error rate and p95; CONSUMER spans are inbound
+work; sparse windows are `no_data` (hold alert state); latency needs ≥ 10 requests and must beat baseline + 3σ; lag
+must grow 30 s; CPU must hold 30 s; JVM GC-pressure rule; superseded / baseline-restoring changes are not causes;
+diagnosis frozen while verifying; reports render the verdict snapshot; recordings start with a flag snapshot.
 
-**Do next, in this order** (feature freeze 18 Oct 2 PM IST):
-1. `make demo-up` → the §5 VERIFY items → write real values into `config/rootcause.yaml` (exporter name/encoding, network, Prometheus queries via `scripts/discover_metrics.py`, flagd path + hot reload, agent URL, flag variants).
-2. `make up && make seed`, then acceptance checks **M0 → M8** against the live demo. Paste outputs in `docs/PROGRESS.md`.
-3. Break every catalogue flag once by hand (§12 note). Record what RootCause sees in `catalogue.yaml` comments. Report faults it can't see — don't add flag-specific hacks.
-4. `make record` the key scenarios (at least `paymentFailure`, `paymentUnreachable`, one latency, one invisible, one AI-agent if it works) → replay works → `make scenario-test` green.
-5. `make chaos N=15` → `docs/SCORECARD.md` (real numbers only, misses included).
-6. Public **replay** deployment (no Docker socket on hosted platforms; replay mode only) + README links + `docs/PRD.md` + video.
+**Do next** (feature freeze 18 Oct 2 PM IST):
+1. When the chaos batch finishes: put its numbers into README "Scorecard" (copy from docs/SCORECARD.md, never type).
+2. Record the video with `docs/DEMO_SCRIPT.md`; add the video link to README.
+3. Optional: `ANTHROPIC_API_KEY` in `.env` → `RC_AGENT_MODE=llm` demo + the `llm_no_graph` baseline (re-run chaos).
+4. After judging: terminate the AWS instance (commands in docs/DEPLOY.md).
 
-**If time runs short, cut in this order:** AI-agent faults → predict tab polish → LLM agent mode (autopilot is the default and enough) → memory tab polish. Never cut: live incident flow (M4–M6), evidence path, scorecard, replay deployment, README/QUERIES.
-
-**Missing files to add:** `docs/PRD.md` (export from the team's PRD doc), `LICENSE` (team picks, e.g. MIT/Apache-2.0), README team section + video/deploy links. Decide whether to commit `uv.lock` (recommended, for reproducible installs).
-
-**Testing without the 6 GB demo** (e.g. on the smaller laptop): run FalkorDB, then
-`RC_CONFIG_DIR=<copy of config with detect.learn_seconds: 30> RC_TICK_SECONDS=2 uv run python -m rootcause.api` and `python scripts/synthetic_traffic.py` (see its docstring). Graph tests can target any FalkorDB via `FALKORDB_TEST_HOST`/`FALKORDB_TEST_PORT`.
+**Gotchas from running it:** keep the Mac awake and plugged in (sleep pauses the Docker VM and corrupts runs);
+rebuild single services with `--no-deps` (otherwise the API restarts); `POST /api/admin/reset` = fresh graph + re-learn;
+SSH to the AWS host is flaky from home networks (retry; deploys don't need it).
