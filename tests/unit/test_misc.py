@@ -212,3 +212,23 @@ def test_targeting_flag_is_switched_through_its_on_branch():
     assert on["flags"]["productCatalogFailure"]["defaultVariant"] == "off"
     assert default_variants(on) == {"productCatalogFailure": "on", "paymentFailure": "off"}
     assert default_variants(with_variant(cfg, "paymentFailure", "100%"))["paymentFailure"] == "100%"
+
+
+async def test_replay_gives_up_after_max_broken_loops(tmp_path):
+    from rootcause.replay.player import Player
+
+    events = [{"type": "marker", "ts": 0, "data": {"name": "start"}},
+              {"type": "marker", "ts": 1, "data": {"name": "break"}},
+              {"type": "prom", "ts": 2, "data": []},
+              {"type": "marker", "ts": 3, "data": {"name": "fix", "kind": "flag_revert", "target": "f"}},
+              {"type": "prom", "ts": 4, "data": []}]
+    path = tmp_path / "s.jsonl.gz"
+    with gzip.open(path, "wt") as fh:
+        fh.writelines(json.dumps(e) + "\n" for e in events)
+
+    async def feed(ev, offset):
+        return None
+
+    p = Player(path, feed)
+    await p.run(warmed=True, max_loops=3)
+    assert p.phase == "expired" and p.loops == 3 and not p.fixed

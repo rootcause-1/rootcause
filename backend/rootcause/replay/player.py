@@ -101,7 +101,9 @@ class Player:
             await self.feed(ev, offset)
         await tick(next_tick)
 
-    async def run(self, warmed: bool = False) -> None:
+    async def run(self, warmed: bool = False, max_loops: int | None = None) -> None:
+        """Play the scenario. With `max_loops`, give up on the broken segment after that many loops without the
+        matching fix (phase 'expired') so an unattended public site starts over instead of piling up incidents."""
         self.phase = "healthy"
         if not warmed:
             await self._play(self.seg["healthy"], stop_on_fix=False)
@@ -110,6 +112,9 @@ class Player:
             if await self._play(self.seg["broken"], stop_on_fix=True):
                 break
             self.loops += 1
+            if max_loops is not None and self.loops >= max_loops:
+                self.phase = "expired"
+                return
             if not self.seg["broken"]:
                 await asyncio.sleep(1)
         self.phase = "recovery"

@@ -20,6 +20,7 @@ const REPLAY_HINT: Record<string, string> = {
   broken: "a fault is live — watch the alerts become one incident, then approve the low-risk fix →",
   recovery: "fix applied — watching recovery",
   finished: "done — the scenario restarts in about 2 minutes",
+  expired: "nobody approved a fix — restarting the scenario…",
 };
 
 export default function App() {
@@ -37,7 +38,9 @@ export default function App() {
   const refreshIncidents = useCallback(async () => {
     const list = await api.incidents("all").catch(() => []);
     setIncidents(list);
-    setSelected((cur) => cur ?? list.find((i) => i.status === "open")?.id ?? list[0]?.id ?? null);
+    // default to the biggest open incident (the storm), not whichever small one opened last
+    const open = list.filter((i) => i.status === "open").sort((a, b) => (b.members?.length ?? 0) - (a.members?.length ?? 0));
+    setSelected((cur) => cur ?? open[0]?.id ?? list[0]?.id ?? null);
   }, []);
   const refreshIncident = useCallback(async () => {
     if (selected) setInc(await api.incident(selected).catch(() => null));

@@ -72,8 +72,10 @@ async def _replay_loop(name: str) -> None:
             await S.rt.player.warm(S.rt.tick, int(s.rc_tick_seconds * 1000))
         finally:
             S.rt.paused = False
-        await S.rt.player.run(warmed=True)
-        await asyncio.sleep(float(s.c("replay", "loop_pause_seconds", default=120)))
+        await S.rt.player.run(warmed=True, max_loops=int(s.c("replay", "max_broken_loops", default=3)))
+        # after a fix: let the visitor look at the recovery and the report; unattended: start over quickly
+        pause = s.c("replay", "loop_pause_seconds", default=120) if S.rt.player.fixed else 5
+        await asyncio.sleep(float(pause))
         await S.rt.db.delete()
         await ensure_indexes(S.rt.db)
         await load_seed(S.rt.db)

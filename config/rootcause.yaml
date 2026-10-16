@@ -106,6 +106,10 @@ agent:
 verify:
   timeout_seconds: 90
 
+replay:
+  loop_pause_seconds: 120                    # after an approved fix: time to look at recovery + report, then restart
+  max_broken_loops: 3                        # unattended: restart the scenario after 3 loops of the broken part
+
 chaos:
   settle_seconds: 45                         # after the first verdict, wait for re-investigations before scoring
 
