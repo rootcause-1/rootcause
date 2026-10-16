@@ -55,8 +55,12 @@ function layout(nodes: GraphNode[], edges: GraphEdge[], teams: Team[], journeys:
   const lanes: Record<string, GraphNode[]> = {};
   for (const n of nodes) (lanes[laneOf(n)] ??= []).push(n);
   // customer-facing teams first: order lanes by the earliest tier of their services, infrastructure last
+  // (the lane holding the website entry first, then by earliest tier, bigger lanes before smaller ones)
   const first = (lane: string) => Math.min(...(lanes[lane] ?? []).map((n) => tier[n.id]), 99);
-  const order = [...teams.map((t) => t.name).sort((a, b) => first(a) - first(b) || a.localeCompare(b)), INFRA];
+  const entry = (lane: string) => ((lanes[lane] ?? []).some((n) => n.id === "frontend-proxy") ? 0 : 1);
+  const size = (lane: string) => lanes[lane]?.length ?? 0;
+  const order = [...teams.map((t) => t.name).sort((a, b) =>
+    entry(a) - entry(b) || first(a) - first(b) || size(b) - size(a) || a.localeCompare(b)), INFRA];
 
   const sx = PAD + JW + GAP;
   const pos: Record<string, Box> = {};
