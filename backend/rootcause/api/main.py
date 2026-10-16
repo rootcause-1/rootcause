@@ -69,7 +69,8 @@ async def _replay_loop(name: str) -> None:
     while True:
         S.rt.paused = True
         try:
-            await S.rt.player.warm(S.rt.tick, int(s.rc_tick_seconds * 1000))
+            await S.rt.player.warm(S.rt.tick, int(s.rc_tick_seconds * 1000),
+                                   live_tail_ms=int(float(s.c("replay", "live_healthy_seconds", default=20)) * 1000))
         finally:
             S.rt.paused = False
         await S.rt.player.run(warmed=True, max_loops=int(s.c("replay", "max_broken_loops", default=3)))

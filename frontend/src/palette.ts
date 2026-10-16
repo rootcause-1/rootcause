@@ -1,4 +1,4 @@
-// One palette for the 3D scene and the DOM. Colour only ever means state:
+// One palette for the service map (SVG) and the DOM. Colour only ever means state:
 // eucalyptus = healthy traffic, saffron = a symptom (alerting), raspberry = the root cause.
 export const C = {
   porcelain: "#F2F3EE", // ground, fog, page

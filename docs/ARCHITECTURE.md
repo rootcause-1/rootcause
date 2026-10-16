@@ -49,13 +49,17 @@ histories for slopes, SSE queues, and the replay player's cursor.
    writes the report; a failure re-proposes without the failed action.
 5. In replay mode actions are simulated and the player jumps to the recording's recovery segment if the fix matches.
 
-### M7 UI (rebuilt 16 Oct)
-1. The service graph is a Three.js scene (`frontend/src/scene/Stage.tsx`); `layout.ts` gives stable tiered positions
-   that only change when the topology changes, so 5-second metric updates never make the scene jump.
-2. Colour is state only (eucalyptus / saffron / raspberry); particles per edge follow its rps, raspberry share = error rate.
-3. The Director camera frames the evidence path (centroid + extent) and orbits it; dragging pauses it for 12 s.
-4. The title card states the story in one sentence; the dossier reads top to bottom; Film mode hides the panels.
-5. All data still comes from `GET /api/graph`, `/api/incidents/*` and the SSE stream; no UI-side state is a source of truth.
+### M7 UI (rebuilt again 16 Oct night: guided incident story)
+1. Left: the service map (`components/ServiceMap.tsx`, plain SVG) — every service/queue/datastore is a labelled card in
+   tiers (longest path from a source), dots travel each call edge at its rps, red dots = its error share.
+2. Above it, `HealthStrip.tsx`: requests/s, failing requests/s, services alerting, and a timeline of failing requests
+   with "incident / fix applied / resolved" markers (the browser only keeps the points for drawing).
+3. Right: `Story.tsx` tells the incident in 7 chapters that light up as the real system reaches them; the root-cause
+   reasons are read off the top hypothesis' five signal scores and the linked change.
+4. `FixFlow.tsx`: "Should I fix this?" → a review of the plan (what changes, what it touches, risk, how success is
+   checked) → "Confirm and apply" → each step ticks as the Action/Incident state really changes, then the report.
+5. Replay: "Run-through from the start" restarts the recording; after the fast warm-up the last 20 s of healthy traffic
+   play live (`replay.live_healthy_seconds`) so you see the shop working before it breaks.
 
 ### M8 Agent and MCP
 1. `tools.py` implements every tool once; the MCP server, autopilot and the LLM agent share it.

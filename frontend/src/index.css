@@ -37,3 +37,9 @@ body { @apply bg-porcelain font-sans text-pine antialiased; font-feature-setting
 /* horizontal tab strip on phones: scrollable, no scrollbar */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* service map */
+@keyframes pulse-ring { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.pulse-ring { animation: pulse-ring 1.4s ease-in-out infinite; }
+@keyframes evidence-flow { to { stroke-dashoffset: -32; } }
+.evidence-flow { animation: evidence-flow 0.9s linear infinite; }

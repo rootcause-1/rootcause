@@ -1,5 +1,5 @@
 // The agent's investigation, in order (each (:Step) in the graph). Hovering a step rings the nodes it cited
-// in the 3D scene.
+// on the service map.
 import type { Step } from "../api";
 import { clock } from "../api";
 

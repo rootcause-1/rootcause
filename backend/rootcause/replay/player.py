@@ -61,6 +61,7 @@ class Player:
         self.phase = "idle"
         self.fixed = False
         self.loops = 0
+        self.live_tail: list[dict[str, Any]] = []  # end of the healthy segment, played live after warm()
 
     def status(self) -> dict[str, Any]:
         return {"scenario": self.name, "phase": self.phase, "loops": self.loops, "fixed": self.fixed,
@@ -85,11 +86,17 @@ class Player:
             await self.feed(ev, offset)
         return False
 
-    async def warm(self, tick: Callable[[int], Awaitable[Any]], tick_ms: int) -> None:
+    async def warm(self, tick: Callable[[int], Awaitable[Any]], tick_ms: int, live_tail_ms: int = 0) -> None:
         """Fast-forward the healthy segment on a virtual clock that ends *now*, so baselines are learned in
-        seconds instead of minutes (visitors of the public replay site should not wait 3 minutes)."""
+        seconds instead of minutes (visitors of the public replay site should not wait 3 minutes).
+        The last `live_tail_ms` of healthy traffic is kept back and played live by run(), so a visitor sees the
+        shop working normally before the fault starts."""
         self.phase = "warming"
         events = self.seg["healthy"]
+        if events and live_tail_ms > 0:
+            cutoff = int(events[-1]["ts"]) - live_tail_ms
+            self.live_tail = [e for e in events if int(e["ts"]) > cutoff]
+            events = [e for e in events if int(e["ts"]) <= cutoff]
         if not events:
             return
         offset = now_ms() - int(events[-1]["ts"])
@@ -105,8 +112,7 @@ class Player:
         """Play the scenario. With `max_loops`, give up on the broken segment after that many loops without the
         matching fix (phase 'expired') so an unattended public site starts over instead of piling up incidents."""
         self.phase = "healthy"
-        if not warmed:
-            await self._play(self.seg["healthy"], stop_on_fix=False)
+        await self._play(self.live_tail if warmed else self.seg["healthy"], stop_on_fix=False)
         self.phase = "broken"
         while not self.fixed:
             if await self._play(self.seg["broken"], stop_on_fix=True):

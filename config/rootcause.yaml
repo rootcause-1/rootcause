@@ -109,6 +109,7 @@ verify:
 replay:
   loop_pause_seconds: 120                    # after an approved fix: time to look at recovery + report, then restart
   max_broken_loops: 3                        # unattended: restart the scenario after 3 loops of the broken part
+  live_healthy_seconds: 20                   # after the fast warm-up, play this much healthy traffic live before the fault
 
 chaos:
   settle_seconds: 45                         # after the first verdict, wait for re-investigations before scoring

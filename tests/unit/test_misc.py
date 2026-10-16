@@ -172,6 +172,29 @@ async def test_replay_warm_fast_forwards_healthy_segment_to_now(tmp_path):
     assert len(ticks) == 13 and ticks == sorted(ticks)  # one virtual tick per 5 s of recorded time
 
 
+async def test_replay_warm_keeps_a_live_healthy_tail(tmp_path):
+    from rootcause.replay.player import Player
+
+    events = [{"type": "marker", "ts": 0, "data": {"name": "start"}}]
+    events += [{"type": "prom", "ts": 1_000 * i, "data": []} for i in range(0, 61)]  # 60 s healthy
+    events += [{"type": "marker", "ts": 61_000, "data": {"name": "break"}}]
+    path = tmp_path / "s.jsonl.gz"
+    with gzip.open(path, "wt") as fh:
+        fh.writelines(json.dumps(e) + "\n" for e in events)
+    fed = []
+
+    async def feed(ev, offset):
+        fed.append(int(ev["ts"]))
+
+    async def tick(t):
+        pass
+
+    p = Player(path, feed)
+    await p.warm(tick, 5_000, live_tail_ms=20_000)
+    assert fed == [1_000 * i for i in range(0, 41)]               # fast-forwarded up to 20 s before the break
+    assert [int(e["ts"]) for e in p.live_tail] == [1_000 * i for i in range(41, 61)]  # the rest plays live
+
+
 def test_compact_otlp_keeps_every_attribute_the_ingest_reads():
     from rootcause.ingest.otlp import USED_SPAN_ATTRIBUTES, compact_otlp, parse_otlp_json
     from rootcause.ingest.spans import IngestConfig, aggregate_traces
