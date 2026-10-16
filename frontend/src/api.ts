@@ -8,7 +8,9 @@ export type GraphEdge = {
   source: string; target: string; type: string; rps?: number | null; err_rate?: number | null;
   p95_ms?: number | null; rate?: number | null; weight?: number | null; protocol?: string | null;
 };
-export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] };
+export type Journey = { id: string; name: string; rps?: number | null; success_rate?: number | null; baseline?: number | null; needs: string[] };
+export type Team = { id: string; name: string; owns: string[]; on_call: string[] };
+export type Graph = { nodes: GraphNode[]; edges: GraphEdge[]; journeys?: Journey[]; teams?: Team[] };
 
 export type Hypothesis = {
   target: string; score: number; rank: number; depth: number; self: number; pagerank: number;

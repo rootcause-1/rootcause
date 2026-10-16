@@ -1,37 +1,37 @@
-// RootCause UI. Left: the shop's live service map with its vital signs. Right: the incident told as a story
-// (what broke, why, who is hurt, "should I fix this?", the fix step by step, back to normal) plus the other tabs.
+// RootCause UI. The company map fills the screen; the incident is told by a narrator popup that advances on its own
+// (components/Narrator.tsx), with the steps shown along the top and the shop's vital signs in the corner.
+// The other tools (break something, predict, memory, reports) open in a drawer.
 // Everything shown is the real state of the graph (GET /api/graph, /api/incidents/{id}) pushed over SSE every tick.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Graph, Incident, Status } from "./api";
 import { api, subscribe } from "./api";
-import HealthStrip, { healthOf, type HealthPoint, type Marker } from "./components/HealthStrip";
+import HealthStrip, { healthOf, type Health, type HealthPoint, type Marker } from "./components/HealthStrip";
+import Narrator, { STAGE_LABEL, STAGES, targetStage, useNarration } from "./components/Narrator";
 import ServiceMap from "./components/ServiceMap";
-import Story from "./components/Story";
 import { C } from "./palette";
 import ChaosLab, { type ChaosRun } from "./tabs/ChaosLab";
 import Memory from "./tabs/Memory";
 import Predict from "./tabs/Predict";
 import Reports from "./tabs/Reports";
 
-const TABS = ["Incident", "Break something", "Predict", "Memory", "Reports"] as const;
-type Tab = (typeof TABS)[number];
-const HISTORY = 90; // ticks kept for the timeline (~7.5 min)
+const TOOLS = ["Break something", "Predict", "Memory", "Reports"] as const;
+type Tool = (typeof TOOLS)[number];
+const HISTORY = 72; // ticks kept for the timeline (6 min)
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("Incident");
+  const [tool, setTool] = useState<Tool | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [graph, setGraph] = useState<Graph | null>(null);
   const [history, setHistory] = useState<HealthPoint[]>([]);
-  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [inc, setInc] = useState<Incident | null>(null);
-  const [reportReady, setReportReady] = useState(false);
   const [cited, setCited] = useState<string[]>([]);
   const [predicted, setPredicted] = useState<string[]>([]);
   const [blast, setBlast] = useState<string[]>([]);
   const [runs, setRuns] = useState<ChaosRun[]>([]);
   const [scenarios, setScenarios] = useState<string[]>([]);
-  const [restarting, setRestarting] = useState(false);
+  const [demo, setDemo] = useState(false);
+  const [autoplay, setAutoplay] = useState(true);
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selected;
 
@@ -42,14 +42,13 @@ export default function App() {
 
   const refreshIncidents = useCallback(async () => {
     const list = await api.incidents("all").catch(() => [] as Incident[]);
-    setIncidents(list);
-    // follow the biggest open incident; otherwise stay on the one being looked at (its "fixed" ending)
+    // follow the biggest open incident; otherwise stay on the one being looked at (its "back to normal" ending)
     const open = list.filter((i) => i.status === "open").sort((a, b) => (b.members?.length ?? 0) - (a.members?.length ?? 0));
     setSelected((cur) => {
       const still = list.find((i) => i.id === cur);
       if (open[0] && (!still || still.status !== "open")) {
-        const justFixed = still?.status === "resolved" && Date.now() - (still.resolved_ts ?? 0) < 3 * 60_000;
-        if (!justFixed || (open[0].members?.length ?? 0) > 1) return open[0].id;
+        const justFixed = still?.status === "resolved" && Date.now() - (still.resolved_ts ?? 0) < 2 * 60_000;
+        if (!justFixed) return open[0].id;
       }
       return still ? cur : open[0]?.id ?? list[0]?.id ?? null;
     });
@@ -57,13 +56,7 @@ export default function App() {
 
   const refreshIncident = useCallback(async () => {
     const id = selectedRef.current;
-    if (!id) { setInc(null); return; }
-    const full = await api.incident(id).catch(() => null);
-    setInc(full);
-    if (full?.status === "resolved") {
-      const reports = await api.reports().catch(() => []);
-      setReportReady(reports.some((r) => r.incident === id));
-    } else setReportReady(false);
+    setInc(id ? await api.incident(id).catch(() => null) : null);
   }, []);
 
   useEffect(() => {
@@ -82,123 +75,113 @@ export default function App() {
       chaos_run: (r: ChaosRun) => setRuns((rs) => [r, ...rs]),
     });
   }, [onGraph, refreshIncidents, refreshIncident]);
-
-  // refresh the open incident every tick too: alerts clearing during recovery do not emit an incident event
+  // refresh every tick too: alarms clearing during recovery do not emit an incident event
   useEffect(() => { refreshIncident(); }, [selected, status?.tick, refreshIncident]);
 
-  async function startRunThrough() {
-    const name = status?.replay?.scenario ?? scenarios[0];
+  async function startDemo() {
+    const name = status?.replay?.scenario ?? scenarios.find((s) => s === "paymentFailure") ?? scenarios[0];
     if (!name) return;
-    setRestarting(true);
-    try {
-      await api.startReplay(name);
-      setHistory([]); setSelected(null); setInc(null); setIncidents([]); setBlast([]); setCited([]); setTab("Incident");
-    } finally { setTimeout(() => setRestarting(false), 3000); }
+    await api.startReplay(name).catch(() => null);
+    setHistory([]); setSelected(null); setInc(null); setBlast([]); setCited([]); setTool(null);
+    setDemo(true); setAutoplay(true);
   }
 
-  const open = inc?.status === "open";
-  const fixing = !!inc?.actions.some((a) => ["approved", "executing", "executed"].includes(a.status));
-  const recentlyFixed = inc?.status === "resolved" && Date.now() - (inc.resolved_ts ?? 0) < 5 * 60_000;
-  const state = (status?.learning_left_ms ?? 0) > 0 ? "learning" : open ? (fixing ? "fixing" : "incident") : recentlyFixed ? "recovered" : "healthy";
-
+  const target = targetStage(status, inc, demo);
+  const stage = useNarration(target);
+  const si = STAGES.indexOf(stage);
+  const reveal = si >= STAGES.indexOf("root") && stage !== "recovered"; // the map keeps the answer until the narrator gets there
   const overlay = useMemo(() => ({
-    root: open || fixing ? inc?.root_target ?? null : null,
-    path: tab === "Incident" && open ? inc?.evidence_path : undefined,
+    root: reveal ? inc?.root_target ?? null : null,
+    path: reveal ? inc?.evidence_path : undefined,
     cited, blast,
-    predicted: tab === "Predict" ? predicted : undefined,
-  }), [open, fixing, inc?.root_target, inc?.evidence_path, tab, cited, blast, predicted]);
+    predicted: tool === "Predict" ? predicted : undefined,
+  }), [reveal, inc?.root_target, inc?.evidence_path, cited, blast, tool, predicted]);
 
   const markers: Marker[] = useMemo(() => {
     if (!inc) return [];
     const m: Marker[] = [{ ts: inc.created_ts, label: "incident", colour: C.raspberry }];
     const applied = inc.actions.find((a) => a.executed_ts);
-    if (applied?.executed_ts) m.push({ ts: applied.executed_ts, label: "fix applied", colour: C.pine });
+    if (applied?.executed_ts) m.push({ ts: applied.executed_ts, label: "fix applied", colour: C.lake });
     if (inc.resolved_ts) m.push({ ts: inc.resolved_ts, label: "resolved", colour: C.eucalyptus });
     return m;
   }, [inc]);
+  const health: Health = (status?.learning_left_ms ?? 0) > 0 ? "learning"
+    : stage === "fixing" ? "fixing" : stage === "recovered" ? "recovered" : inc?.status === "open" ? "incident" : "healthy";
 
   const replay = status?.mode === "replay";
-  const others = incidents.filter((i) => i.id !== selected).slice(0, 6);
+  const steps = STAGES.slice(1);
 
   return (
-    <div className="min-h-full bg-porcelain">
-      <header className="border-b border-pine/10 bg-paper/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
-          <div className="flex items-baseline gap-3">
-            <h1 className="font-display text-2xl font-extrabold tracking-[-0.03em]">RootCause</h1>
-            <span className="hidden text-sm muted md:inline">the AI on-call engineer for the OpenTelemetry Demo shop</span>
-          </div>
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide ${replay ? "bg-plum/15 text-plum" : "bg-eucalyptus/20 text-pine"}`}>
+    <div className="relative h-full w-full overflow-hidden bg-porcelain">
+      {/* the map is the page */}
+      <div className={`absolute inset-0 overflow-auto px-4 pb-4 pt-[112px] md:px-6 ${stage === "intro" ? "" : "xl:pr-[500px]"}`}>
+        <div className="h-full min-h-[560px] min-w-[1000px] xl:min-w-0"><ServiceMap graph={graph} overlay={overlay} /></div>
+      </div>
+
+      {/* top bar */}
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-wrap items-center gap-3 bg-gradient-to-b from-porcelain via-porcelain/90 to-transparent px-4 pb-6 pt-3 md:px-6">
+        <div className="pointer-events-auto flex items-baseline gap-3">
+          <h1 className="text-xl font-extrabold tracking-tight">Root<span className="text-lake">Cause</span></h1>
+          <span className="hidden text-sm muted md:inline">AI on-call engineer · Astronomy Shop (OpenTelemetry Demo)</span>
+          <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold tracking-widest ${replay ? "bg-plum/15 text-plum" : "bg-eucalyptus/15 text-eucalyptus"}`}>
             {!status ? "CONNECTING" : replay ? "REPLAY" : "LIVE"}
           </span>
-          <nav className="no-scrollbar order-last flex w-full gap-1 overflow-x-auto lg:order-none lg:ml-auto lg:w-auto">
-            {TABS.map((t) => (
-              <button key={t} onClick={() => setTab(t)} aria-pressed={tab === t}
-                      className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition ${tab === t ? "bg-pine text-paper" : "hover:bg-pine/5"}`}>{t}</button>
-            ))}
-          </nav>
-          {replay && (
-            <button className="btn-primary ml-auto lg:ml-0" disabled={restarting} onClick={startRunThrough}>
-              {restarting ? "Restarting…" : "▶ Run-through from the start"}
-            </button>
-          )}
         </div>
+        <nav className="pointer-events-auto ml-auto flex items-center gap-1">
+          {TOOLS.map((t) => (
+            <button key={t} onClick={() => setTool(tool === t ? null : t)} aria-pressed={tool === t}
+                    className={`hidden rounded-lg px-3 py-1.5 text-sm font-medium transition md:block ${tool === t ? "bg-white/10" : "muted hover:bg-white/5 hover:text-pine"}`}>{t}</button>
+          ))}
+          {replay && <button className="btn-primary ml-2" onClick={startDemo}>{demo ? "↺ Restart demo" : "▶ Start demo"}</button>}
+        </nav>
+        {/* where we are in the story */}
+        {stage !== "intro" && (
+          <ol className="pointer-events-auto order-last flex w-full items-center gap-1 overflow-x-auto pt-1 no-scrollbar">
+            {steps.map((s, i) => {
+              const k = i + 1;
+              const state = k < si ? "done" : k === si ? "now" : "next";
+              return (
+                <li key={s} className="flex shrink-0 items-center gap-1">
+                  <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                    state === "now" ? "bg-lake text-[#04121F]" : state === "done" ? "bg-white/10 text-pine" : "text-pine-soft/60"}`}>
+                    {state === "done" ? "✓" : <span className="tabular-nums">{k}</span>} {STAGE_LABEL[s]}
+                  </span>
+                  {k < steps.length && <span className="h-px w-3 bg-white/15" aria-hidden />}
+                </li>
+              );
+            })}
+          </ol>
+        )}
       </header>
 
-      <main className="mx-auto grid max-w-[1600px] gap-5 p-4 md:p-5 lg:grid-cols-[minmax(0,1fr)_460px]">
-        <section className="flex min-w-0 flex-col gap-4">
-          <div className="sheet p-4"><HealthStrip history={history} markers={markers} state={state} /></div>
-          <div className="sheet flex min-h-[420px] flex-col p-4 lg:h-[calc(100vh-250px)]">
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-display text-lg font-bold">The shop, live from the graph</h2>
-              <p className="text-xs muted">
-                {status ? `${status.graph} · tick ${status.tick}` : ""}{replay && status?.replay ? ` · recorded incident (${status.replay.phase})` : ""}
-              </p>
-            </div>
-            {/* phones: keep the map readable and let it scroll sideways */}
-            <div className="min-h-0 flex-1 overflow-x-auto"><div className="h-full min-w-[860px] lg:min-w-0">
-              <ServiceMap graph={graph} overlay={overlay} />
-            </div></div>
-            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs muted">
-              <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-eucalyptus" />healthy</li>
-              <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-saffron" />alerting</li>
-              <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-raspberry" />root cause / failing requests</li>
-              <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full border-2 border-lake" />touched by the fix</li>
-              {tab === "Predict" && <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full border-2 border-plum" />predicted to fail</li>}
-            </ul>
-          </div>
-          {replay && (
-            <p className="px-1 text-xs muted">
-              Replay: real telemetry recorded from the OpenTelemetry Demo is fed through the real RootCause engine, so every
-              alert, diagnosis and step here is computed live. Applying a fix is simulated; the recovery that follows is the one
-              recorded on the real demo.
-            </p>
-          )}
-        </section>
+      {/* right column (wide screens): vital signs on top, the narrator popup at the bottom; on smaller screens the
+          narrator floats over the bottom of the map */}
+      {stage !== "intro" && (
+        <div className="sheet absolute right-6 top-[112px] z-20 hidden w-[460px] p-4 xl:block">
+          <HealthStrip history={history} markers={markers} state={health} />
+        </div>
+      )}
+      <div className={`absolute z-30 ${stage === "intro"
+        ? "inset-x-4 top-1/2 mx-auto max-w-[560px] -translate-y-1/2"
+        : "inset-x-3 bottom-3 max-h-[60vh] overflow-y-auto md:inset-x-auto md:bottom-6 md:right-6 md:w-[460px] xl:max-h-[calc(100vh-380px)]"}`}>
+        <div key={stage} className="animate-[popup_.45s_ease-out]">
+          <Narrator stage={stage} status={status} inc={inc} graph={graph} demo={demo} autoplay={autoplay}
+                    onStart={startDemo} onAutoplay={setAutoplay} onChanged={refreshIncident} onCite={setCited}
+                    onBlast={setBlast} onOpenReport={() => setTool("Reports")} />
+        </div>
+      </div>
+      {stage === "intro" && <div className="absolute inset-0 z-20 bg-porcelain/50 backdrop-blur-[2px]" aria-hidden />}
 
-        <aside className="sheet min-w-0 p-5 lg:h-[calc(100vh-110px)] lg:overflow-y-auto">
-          {tab === "Incident" && (
-            <>
-              <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="font-display text-2xl font-bold tracking-tight">{inc ? `Incident ${inc.id}` : "No incident"}</h2>
-                {others.length > 0 && (
-                  <select className="field max-w-[180px] py-1 text-xs" value="" aria-label="Open another incident"
-                          onChange={(e) => e.target.value && setSelected(e.target.value)}>
-                    <option value="">Other incidents…</option>
-                    {others.map((i) => <option key={i.id} value={i.id}>{i.id} · {i.status}{i.root_target ? ` · ${i.root_target}` : ""}</option>)}
-                  </select>
-                )}
-              </div>
-              <Story status={status} inc={inc} reportReady={reportReady} onChanged={refreshIncident} onCite={setCited}
-                     onBlast={setBlast} onOpenReport={() => setTab("Reports")} onStart={replay ? startRunThrough : undefined} />
-            </>
-          )}
-          {tab === "Break something" && <ChaosLab status={status} runs={runs} />}
-          {tab === "Predict" && <Predict graph={graph} onOverlay={setPredicted} />}
-          {tab === "Memory" && <Memory />}
-          {tab === "Reports" && <Reports />}
+      {/* tools drawer */}
+      {tool && (
+        <aside className="sheet absolute bottom-4 right-4 top-[112px] z-40 w-[min(560px,calc(100%-32px))] overflow-y-auto p-6 md:right-6">
+          <button className="absolute right-4 top-4 rounded-lg px-2 py-1 text-sm muted hover:bg-white/5" onClick={() => setTool(null)} aria-label="Close">✕</button>
+          {tool === "Break something" && <ChaosLab status={status} runs={runs} />}
+          {tool === "Predict" && <Predict graph={graph} onOverlay={setPredicted} />}
+          {tool === "Memory" && <Memory />}
+          {tool === "Reports" && <Reports />}
         </aside>
-      </main>
+      )}
     </div>
   );
 }

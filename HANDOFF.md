@@ -20,7 +20,7 @@ Everything below runs and is on `main`. Nothing is half-merged; there are no oth
 | Blind chaos scorecard (15 random faults) | RootCause **87 % top-1 / 93 % top-3**, median 53 s; alert heuristics 40 %; graph signals off 80 % | `docs/SCORECARD.md`, history in `docs/scorecards/` |
 | Replay recordings | 6 scenarios recorded from the live demo; `make scenario-test` 6 / 6 | `replay/*.jsonl.gz` |
 | Public demo | **http://3.234.90.242/** (AWS, replay mode), redeploys itself from `main` | `docs/DEPLOY.md` |
-| UI | guided incident story: live 2D service map + timeline on the left, the incident as 7 chapters with a "Should I fix this?" flow on the right | `frontend/src/components/` |
+| UI | self-running demo: full-screen company map (customers → team lanes → infra) with popups that advance on their own; one click on **Start demo** | `frontend/src/components/` |
 | Tests | `make lint test` → 162 passed | – |
 
 The two known misses (both honest, both documented): `productCatalogLockContention` ranks the database first and the
@@ -31,7 +31,7 @@ real cause second; `kafkaQueueProblems` floods the database, which forms its own
 ## 2. What is left (in priority order)
 
 1. **Record the demo video** (≤ 3 min) with `docs/DEMO_SCRIPT.md`. Easiest: open the public site, click
-   **Run-through from the start**, let the story fill in, then **Yes, fix it** → **Confirm and apply**. Put the link in `README.md` (search for `TODO: add YouTube link`).
+   **Start demo** and let it run (~3 min, the fix auto-approves after a countdown). Put the link in `README.md` (search for `TODO: add YouTube link`).
 2. **README team section**: Yash wrote a draft; fix it to say who did what (`## Team` in `README.md`).
 3. **Claude Desktop check** (closes M8): paste the snippet from README "Use it from Claude Desktop" into
    `claude_desktop_config.json`, with the stack running, and ask "Who owns payment?". Paste the answer into
@@ -93,8 +93,8 @@ backend/rootcause/
   replay/      recorder.py · player.py (warm-up, loop, give up after 3 unattended loops)
   graph/       queries/*.cypher (76 named queries; docs/QUERIES.md is generated from their headers)
 frontend/src/
-  components/  ServiceMap.tsx (SVG map) · HealthStrip.tsx (KPIs + timeline) · Story.tsx (7 chapters) ·
-               FixFlow.tsx (should I fix this? → plan → steps) · ActionCard.tsx · TrailDrawer.tsx · Inline.tsx
+  components/  ServiceMap.tsx (company map) · Narrator.tsx (popups, auto-advance, fix + countdown) ·
+               HealthStrip.tsx (vitals + timeline) · ActionCard.tsx · TrailDrawer.tsx · Inline.tsx
   palette.ts   colours shared by the map and the page
   tabs/        ChaosLab · Predict · Memory · Reports
 config/        rootcause.yaml (every threshold, with a comment saying why) · seed.yaml (invented teams/runbooks)

@@ -49,17 +49,18 @@ histories for slopes, SSE queues, and the replay player's cursor.
    writes the report; a failure re-proposes without the failed action.
 5. In replay mode actions are simulated and the player jumps to the recording's recovery segment if the fix matches.
 
-### M7 UI (rebuilt again 16 Oct night: guided incident story)
-1. Left: the service map (`components/ServiceMap.tsx`, plain SVG) — every service/queue/datastore is a labelled card in
-   tiers (longest path from a source), dots travel each call edge at its rps, red dots = its error share.
-2. Above it, `HealthStrip.tsx`: requests/s, failing requests/s, services alerting, and a timeline of failing requests
-   with "incident / fix applied / resolved" markers (the browser only keeps the points for drawing).
-3. Right: `Story.tsx` tells the incident in 7 chapters that light up as the real system reaches them; the root-cause
-   reasons are read off the top hypothesis' five signal scores and the linked change.
-4. `FixFlow.tsx`: "Should I fix this?" → a review of the plan (what changes, what it touches, risk, how success is
-   checked) → "Confirm and apply" → each step ticks as the Action/Incident state really changes, then the report.
-5. Replay: "Run-through from the start" restarts the recording; after the fast warm-up the last 20 s of healthy traffic
-   play live (`replay.live_healthy_seconds`) so you see the shop working before it breaks.
+### M7 UI (17 Oct: company map + self-running demo)
+1. The page is the company map (`components/ServiceMap.tsx`, SVG): customers (Journey nodes) on the left, every service
+   in the lane of the Team that OWNS it (with who is on call), shared infrastructure at the bottom; live dots per call.
+2. `GET /api/graph` also returns `journeys` (graph_journeys: traffic, success vs baseline, services each one critically
+   REQUIRES) and `teams` (graph_teams), so one broken box visibly ripples to its team lane and to the customers.
+3. `components/Narrator.tsx` tells the incident in popups, one step per stage (healthy → alerts → one incident →
+   investigating → root cause → impact → fix → fixing → recovered); each step is unlocked by real Incident/Action state
+   and stays up long enough to read; the map only reveals the root cause when the narrator gets there.
+4. "Start demo" restarts the recording; in replay with autoplay on, the fix popup approves low-risk fixes after a visible
+   12 s countdown (a real POST /approve, labelled as a demo stand-in for a person). Live mode always waits for a human.
+5. Dark theme on semantic tokens (Inter), vitals card with a failing-requests timeline, tools (break, predict, memory,
+   reports) in a drawer.
 
 ### M8 Agent and MCP
 1. `tools.py` implements every tool once; the MCP server, autopilot and the LLM agent share it.

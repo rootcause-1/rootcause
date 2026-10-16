@@ -1,17 +1,18 @@
-// One palette for the service map (SVG) and the DOM. Colour only ever means state:
-// eucalyptus = healthy traffic, saffron = a symptom (alerting), raspberry = the root cause.
+// One palette for the service map (SVG) and the DOM (dark theme). Colour only ever means state:
+// eucalyptus = healthy, saffron = a symptom (alerting), raspberry = the root cause / failing requests.
 export const C = {
-  porcelain: "#F2F3EE", // ground, fog, page
-  paper: "#FBFBF7",     // panels
-  pine: "#17312A",      // ink
-  pineSoft: "#4C6158",  // secondary ink
-  mist: "#DCE3DA",      // hairlines, idle nodes
-  eucalyptus: "#5FA37F",
-  eucalyptusLight: "#A9D3BA",
-  saffron: "#F0A830",
-  raspberry: "#D6265C",
-  plum: "#7B4B94",      // predictions (what-if)
-  lake: "#2F7FA8",      // blast radius (who depends on the root cause)
+  porcelain: "#0A0F1C", // page
+  paper: "#121A2B",     // panels, cards
+  card: "#17213A",      // service cards on the map
+  pine: "#E6EBF2",      // ink
+  pineSoft: "#94A3B8",  // secondary ink
+  mist: "#26324A",      // hairlines
+  eucalyptus: "#10B981",
+  eucalyptusLight: "#1F5F52", // healthy edges (quiet on a dark background)
+  saffron: "#F59E0B",
+  raspberry: "#F43F5E",
+  plum: "#A78BFA",      // predictions (what-if)
+  lake: "#38BDF8",      // touched by the fix
 } as const;
 
 /** Edge colour by error rate: healthy -> symptom -> failing. */

@@ -1,132 +1,218 @@
-// The live service map: every service, queue and datastore of the shop as a labelled card, laid out in tiers so
-// requests flow left -> right (callers on the left, their dependencies to the right).
+// The company map: the shop's customers on the left, the services grouped by the team that owns them (with who is on
+// call), shared infrastructure at the bottom. Requests flow left -> right; one broken box visibly ripples out to the
+// teams and the customers who depend on it.
 //
-// What you see is the graph in FalkorDB, refreshed every 5 s:
-// - dots travel along each call edge; more dots = more traffic, red dots = the share of failing requests;
-// - line colour = error rate on that call (green healthy, amber some errors, red failing);
-// - card colour = state: white healthy, amber alerting (:Anomalous), red = the root cause;
-// - rings: dashed amber = evidence path, blue = would be touched by the fix (blast radius),
-//   plum = predicted to fail (Predict tab), dark = cited by the agent step you are hovering.
+// Everything is the graph in FalkorDB, refreshed every 5 s (GET /api/graph: graph_nodes, graph_edges, graph_journeys,
+// graph_teams):
+// - customer cards = Journey nodes (requests per hour, how many are failing); a journey turns red when a service it
+//   critically REQUIRES is alerting or its success rate drops;
+// - service cards = Service / Queue / Datastore nodes, in the lane of the Team that OWNS them;
+// - dots travel along each CALLS / USES / messaging edge at its request rate; red dots = its share of failing requests;
+// - amber = alerting (:Anomalous), red = root cause, animated dashed line = evidence path; rings: blue = touched by the
+//   fix, purple = predicted to fail, white = cited by the agent step you are hovering.
 import { useMemo } from "react";
-import type { Graph, GraphEdge, GraphNode } from "../api";
+import type { Graph, GraphEdge, GraphNode, Journey, Team } from "../api";
 import { C, errColour } from "../palette";
 
 export type Overlay = { root?: string | null; path?: string[]; cited?: string[]; predicted?: string[]; blast?: string[] };
 
 const FLOW = new Set(["CALLS", "USES", "PRODUCES_TO", "CONSUMED_BY"]);
-const HIDDEN = new Set(["flagd", "flagd-ui", "otel-collector"]); // infrastructure, not part of the shop's request flow
-const NAMES: Record<string, string> = { "load-generator": "shoppers", "frontend-web": "browser" };
-const W = 138, H = 50, COL = 172, ROW = 64, PAD = 16;
+const HIDDEN = new Set(["flagd", "flagd-ui", "otel-collector", "load-generator", "frontend-web"]);
+/** What each service is for, in business terms (the technical id is shown under it). */
+export const BUSINESS: Record<string, string> = {
+  "frontend-proxy": "Website gateway", frontend: "Web storefront", "image-provider": "Product images",
+  cart: "Shopping cart", ad: "Ads", recommendation: "Recommendations", "product-reviews": "Product reviews",
+  checkout: "Checkout", payment: "Payments", currency: "Currency exchange", "fraud-detection": "Fraud detection",
+  accounting: "Accounting", shipping: "Shipping", quote: "Shipping quotes", email: "Order emails", kafka: "Event bus",
+  "product-catalog": "Product catalog", agent: "AI shopping assistant", "queue:orders": "Orders queue",
+  "db:astronomy-db": "Product database", "cache:valkey-cart": "Cart store",
+};
+export const nameOf = (id: string) => BUSINESS[id] ?? id.replace(/^(queue|db|cache):/, "");
 
-type Pos = Record<string, { x: number; y: number }>;
+const W = 146, H = 50, COL = 168, ROW = 60, PAD = 18, JW = 168, JH = 54, GAP = 76, BAND_HEAD = 26, BAND_GAP = 12;
+const INFRA = "Shared infrastructure";
 
-/** Tier = longest path from a source; within a tier, order by the mean position of callers (short edges). */
-function layout(nodes: GraphNode[], edges: GraphEdge[]): { pos: Pos; width: number; height: number } {
-  const ids = nodes.map((n) => n.id).sort();
-  const preds: Record<string, string[]> = Object.fromEntries(ids.map((id) => [id, []]));
-  for (const e of edges) preds[e.target]?.push(e.source);
-  const tier: Record<string, number> = Object.fromEntries(ids.map((id) => [id, 0]));
-  for (let pass = 0; pass < ids.length; pass++) {
+type Box = { x: number; y: number };
+type Band = { team: string; label: string; onCall?: string; y: number; h: number; hot: boolean };
+
+function tiers(nodes: GraphNode[], edges: GraphEdge[]): Record<string, number> {
+  const tier: Record<string, number> = Object.fromEntries(nodes.map((n) => [n.id, 0]));
+  for (let pass = 0; pass < nodes.length; pass++) {
     let moved = false;
     for (const e of edges) {
-      if (tier[e.target] < tier[e.source] + 1 && tier[e.source] + 1 < 10) { tier[e.target] = tier[e.source] + 1; moved = true; }
+      if (tier[e.target] < tier[e.source] + 1 && tier[e.source] + 1 < 8) { tier[e.target] = tier[e.source] + 1; moved = true; }
     }
     if (!moved) break;
   }
-  const tiers: string[][] = [];
-  for (const id of ids) (tiers[tier[id]] ??= []).push(id);
-  const order: Record<string, number> = {};
-  tiers.forEach((t) => t?.forEach((id, i) => (order[id] = i)));
-  for (let sweep = 0; sweep < 3; sweep++) {
-    for (const t of tiers) {
-      if (!t) continue;
-      const bary = (id: string) => {
-        const p = preds[id].filter((x) => order[x] !== undefined);
-        return p.length ? p.reduce((s, x) => s + order[x], 0) / p.length : order[id];
-      };
-      t.sort((a, b) => bary(a) - bary(b) || a.localeCompare(b));
-      t.forEach((id, i) => (order[id] = i));
+  return tier;
+}
+
+function layout(nodes: GraphNode[], edges: GraphEdge[], teams: Team[], journeys: Journey[], hot: Set<string>) {
+  const tier = tiers(nodes, edges);
+  const owner: Record<string, Team> = {};
+  for (const t of teams) for (const s of t.owns) owner[s] = t;
+  const laneOf = (n: GraphNode) => (n.labels.includes("Service") && owner[n.id] ? owner[n.id].name : INFRA);
+  const order = [...teams.map((t) => t.name), INFRA];
+  const lanes: Record<string, GraphNode[]> = {};
+  for (const n of nodes) (lanes[laneOf(n)] ??= []).push(n);
+
+  const sx = PAD + JW + GAP;
+  const pos: Record<string, Box> = {};
+  const bands: Band[] = [];
+  let y = PAD + 22;
+  for (const lane of order) {
+    const members = lanes[lane];
+    if (!members?.length) continue;
+    const byTier: Record<number, GraphNode[]> = {};
+    for (const n of [...members].sort((a, b) => a.id.localeCompare(b.id))) (byTier[tier[n.id]] ??= []).push(n);
+    const rows = Math.max(...Object.values(byTier).map((l) => l.length));
+    for (const [t, list] of Object.entries(byTier)) {
+      list.forEach((n, i) => (pos[n.id] = { x: sx + Number(t) * COL, y: y + BAND_HEAD + i * ROW }));
     }
+    const h = BAND_HEAD + rows * ROW - (ROW - H) + 12;
+    const team = teams.find((t) => t.name === lane);
+    bands.push({ team: lane, label: lane === INFRA ? INFRA : `${lane} team`, onCall: team?.on_call[0], y, h,
+                 hot: members.some((n) => hot.has(n.id)) });
+    y += h + BAND_GAP;
   }
-  const tallest = Math.max(1, ...tiers.map((t) => t?.length ?? 0));
-  const pos: Pos = {};
-  tiers.forEach((t, ti) => t?.forEach((id, i) => {
-    pos[id] = { x: PAD + ti * COL, y: PAD + (i + (tallest - t.length) / 2) * ROW };
-  }));
-  return { pos, width: PAD * 2 + (tiers.length - 1) * COL + W, height: PAD * 2 + (tallest - 1) * ROW + H };
+  const maxTier = Math.max(0, ...nodes.map((n) => tier[n.id]));
+  const width = sx + maxTier * COL + W + PAD + 8;
+  const height = Math.max(y - BAND_GAP + PAD, PAD + 22 + journeys.length * (JH + 14) + PAD);
+  // customers: centred against the lanes
+  const jTotal = journeys.length * (JH + 14) - 14;
+  const jy0 = Math.max(PAD + 22, (height - jTotal) / 2);
+  const jpos: Record<string, Box> = {};
+  journeys.forEach((j, i) => (jpos[j.id] = { x: PAD, y: jy0 + i * (JH + 14) }));
+  return { pos, jpos, bands, width, height, sx };
 }
 
-function edgePath(a: { x: number; y: number }, b: { x: number; y: number }): string {
-  if (b.x > a.x) { // forward: right side of the caller to the left side of the callee
-    const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2, dx = (x2 - x1) / 2;
-    return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
-  }
-  // same tier or backwards: loop out under the cards
-  const x1 = a.x + W / 2, y1 = a.y + H, x2 = b.x + W / 2, y2 = b.y + H;
-  return `M${x1},${y1} C${x1},${y1 + 40} ${x2},${y2 + 40} ${x2},${y2}`;
+function curve(x1: number, y1: number, x2: number, y2: number): string {
+  const dx = Math.max(30, (x2 - x1) / 2);
+  return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
 }
 
-const rate = (e: GraphEdge) => e.rps ?? e.rate ?? 0;
+function edgePath(a: Box, b: Box): string {
+  if (b.x > a.x) return curve(a.x + W, a.y + H / 2, b.x, b.y + H / 2);
+  const x1 = a.x + W / 2, y1 = a.y + H, x2 = b.x + W / 2, y2 = b.y; // same column: drop down/up between cards
+  return y2 > y1 ? `M${x1},${y1} C${x1 + 40},${y1 + 20} ${x2 + 40},${y2 - 20} ${x2},${y2}`
+    : `M${x1},${a.y} C${x1 + 50},${a.y - 30} ${x2 + 50},${b.y + H + 30} ${x2},${b.y + H}`;
+}
+
+const rateOf = (e: GraphEdge) => e.rps ?? e.rate ?? 0;
 const fmtRate = (v?: number | null) => (v == null ? "–" : v >= 10 ? Math.round(v).toString() : v >= 1 ? v.toFixed(1) : v.toFixed(2));
+export const perHour = (rps?: number | null) => {
+  const h = (rps ?? 0) * 3600;
+  return h >= 1000 ? `${(h / 1000).toFixed(1)}k` : `${Math.round(h)}`;
+};
+/** "hurt": the journey's success rate fell 5+ points under its normal; "risk": it critically needs the root cause. */
+export function journeyState(j: Journey, root?: string | null): "hurt" | "risk" | "ok" {
+  const drop = (j.baseline ?? 1) - (j.success_rate ?? 1);
+  if (drop >= 0.05) return "hurt";
+  return root && j.needs.includes(root) ? "risk" : "ok";
+}
 
-export default function ServiceMap({ graph, overlay, onPick }: { graph: Graph | null; overlay: Overlay; onPick?: (id: string) => void }) {
-  const { nodes, flows, pos, width, height } = useMemo(() => {
-    const all = graph?.nodes ?? [];
-    const keep = all.filter((n) => !HIDDEN.has(n.id));
+export default function ServiceMap({ graph, overlay }: { graph: Graph | null; overlay: Overlay }) {
+  const root = overlay.root?.startsWith("edge:") ? overlay.root.split("->")[1] : overlay.root;
+  const rootEdge = overlay.root?.startsWith("edge:") ? overlay.root.slice(5) : null;
+  const hotKey = (graph?.nodes ?? []).filter((n) => n.labels.includes("Anomalous")).map((n) => n.id).sort().join();
+
+  const view = useMemo(() => {
+    const keep = (graph?.nodes ?? []).filter((n) => !HIDDEN.has(n.id));
     const ids = new Set(keep.map((n) => n.id));
     const flows = (graph?.edges ?? []).filter((e) => FLOW.has(e.type) && ids.has(e.source) && ids.has(e.target) && e.source !== e.target);
     const linked = new Set(flows.flatMap((e) => [e.source, e.target]));
     const nodes = keep.filter((n) => linked.has(n.id) || (n.rps ?? 0) > 0);
-    return { nodes, flows, ...layout(nodes, flows) };
-  }, [graph]);
+    const hot = new Set(nodes.filter((n) => n.labels.includes("Anomalous")).map((n) => n.id));
+    const journeys = (graph?.journeys ?? []).filter((j) => (j.rps ?? 0) > 0 || j.needs.length > 0)
+      .sort((a, b) => (b.rps ?? 0) - (a.rps ?? 0));
+    const entry = nodes.find((n) => n.id === "frontend-proxy") ?? nodes.find((n) => n.id === "frontend");
+    return { nodes, flows, hot, journeys, entry, ...layout(nodes, flows, graph?.teams ?? [], journeys, hot) };
+  }, [graph, hotKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const root = overlay.root?.startsWith("edge:") ? overlay.root.split("->")[1] : overlay.root;
-  const rootEdge = overlay.root?.startsWith("edge:") ? overlay.root.slice(5) : null;
+  if (!graph) return <div className="grid h-full place-items-center text-sm muted">Connecting to RootCause…</div>;
+  if (view.nodes.length === 0) return <div className="grid h-full place-items-center text-sm muted">Waiting for the first traces…</div>;
+
+  const { nodes, flows, hot, journeys, entry, pos, jpos, bands, width, height, sx } = view;
   const incident = !!root;
-  const hot = new Set(nodes.filter((n) => n.labels.includes("Anomalous")).map((n) => n.id));
   const onPath = (e: GraphEdge) => {
     const p = overlay.path ?? [];
     const i = p.indexOf(e.source);
     return i >= 0 && p[i + 1] === e.target;
   };
 
-  if (!graph) return <div className="grid h-full place-items-center text-sm muted">Connecting to RootCause…</div>;
-  if (nodes.length === 0) return <div className="grid h-full place-items-center text-sm muted">Waiting for the first traces…</div>;
-
   return (
-    <svg viewBox={`0 0 ${width} ${height + 20}`} className="h-full w-full" role="img"
-         aria-label="Service map: services of the shop and the calls between them">
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet" role="img"
+         aria-label="Company map: customers, the services each team owns, and the calls between them">
       <defs>
-        <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse"
-                orient="auto-start-reverse">
-          <path d="M0,0 L8,4 L0,8 z" fill={C.mist} />
+        <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#3B4A66" />
         </marker>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" /></filter>
       </defs>
 
+      {/* column headings */}
+      <text x={PAD} y={PAD + 6} fontSize={11} fontWeight={700} letterSpacing="0.1em" fill={C.pineSoft}>CUSTOMERS</text>
+      <text x={sx - 14} y={PAD + 6} fontSize={11} fontWeight={700} letterSpacing="0.1em" fill={C.pineSoft}>TEAMS AND THE SERVICES THEY RUN</text>
+
+      {/* team lanes */}
+      {bands.map((b) => (
+        <g key={b.team}>
+          <rect x={sx - 14} y={b.y} width={width - sx - PAD + 14} height={b.h} rx={14}
+                fill={b.hot ? "rgba(244,63,94,0.06)" : "rgba(148,163,184,0.04)"}
+                stroke={b.hot ? "rgba(244,63,94,0.45)" : "rgba(148,163,184,0.14)"} strokeWidth={1} />
+          <text x={sx - 2} y={b.y + 17} fontSize={11.5} fill={b.hot ? C.raspberry : C.pineSoft}>
+            <tspan fontWeight={700} letterSpacing="0.06em">{b.label.toUpperCase()}</tspan>
+            {b.onCall && <tspan dx={8}>· on call: {b.onCall}{b.hot ? " · affected" : ""}</tspan>}
+          </text>
+        </g>
+      ))}
+
+      {/* customers -> the website */}
+      {entry && pos[entry.id] && journeys.map((j) => {
+        const a = jpos[j.id], b = pos[entry.id];
+        const js = journeyState(j, root);
+        const hurt = js !== "ok";
+        const d = curve(a.x + JW, a.y + JH / 2, b.x, b.y + H / 2);
+        const dots = (j.rps ?? 0) > 0 ? Math.min(4, 1 + Math.floor(Math.log2(1 + (j.rps ?? 0) * 6))) : 0;
+        const failing = 1 - (j.success_rate ?? 1);
+        const red = hurt && failing > 0.02 ? Math.max(1, Math.round(dots * failing)) : 0;
+        return (
+          <g key={`j>${j.id}`}>
+            <path d={d} fill="none" stroke={js === "hurt" ? C.raspberry : js === "risk" ? C.saffron : "#2A3A57"} strokeWidth={hurt ? 2 : 1.4} opacity={hurt ? 0.9 : 0.8}
+                  strokeDasharray={hurt ? "6 5" : undefined} className={hurt ? "evidence-flow" : undefined} />
+            {Array.from({ length: dots }, (_, i) => (
+              <circle key={i} r={2.6} fill={i < red ? C.raspberry : C.eucalyptus}>
+                <animateMotion dur="2.6s" begin={`${(-i * 2.6) / dots}s`} repeatCount="indefinite" path={d} />
+              </circle>
+            ))}
+          </g>
+        );
+      })}
+
+      {/* calls between services */}
       {flows.map((e) => {
         const a = pos[e.source], b = pos[e.target];
         if (!a || !b) return null;
         const d = edgePath(a, b);
-        const r = rate(e);
+        const r = rateOf(e);
         const err = e.err_rate ?? 0;
         const path = onPath(e) || rootEdge === `${e.source}->${e.target}`;
         const involved = path || (hot.has(e.source) && hot.has(e.target));
         const dim = incident && !involved;
-        const stroke = path ? C.raspberry : errColour(err);
-        const width = path ? 3.5 : 1 + Math.min(4, Math.log2(1 + r * 3));
+        const stroke = path ? C.raspberry : err >= 0.01 ? errColour(err) : "#2A3A57";
+        const w = path ? 3 : 1 + Math.min(3, Math.log2(1 + r * 3));
         const dots = r <= 0 ? 0 : Math.min(5, 1 + Math.floor(Math.log2(1 + r * 2)));
         const red = err >= 0.05 ? Math.max(1, Math.round(dots * err)) : 0;
         const dur = r > 5 ? 1.6 : r > 1 ? 2.4 : r > 0.2 ? 3.4 : 5;
         const async = e.type === "PRODUCES_TO" || e.type === "CONSUMED_BY";
         return (
-          <g key={`${e.type}:${e.source}>${e.target}`} opacity={dim ? 0.25 : 1} style={{ transition: "opacity .6s" }}>
-            <path d={d} fill="none" stroke={stroke} strokeWidth={width} strokeLinecap="round"
-                  strokeDasharray={async ? "5 5" : path ? "10 6" : undefined} markerEnd="url(#arrow)"
-                  className={path ? "evidence-flow" : undefined}>
-              <title>{`${e.source} → ${e.target} (${e.type.toLowerCase()}): ${fmtRate(r)} req/s, ${Math.round(err * 100)} % failing`}</title>
+          <g key={`${e.type}:${e.source}>${e.target}`} opacity={dim ? 0.22 : 1} style={{ transition: "opacity .6s" }}>
+            <path d={d} fill="none" stroke={stroke} strokeWidth={w} strokeLinecap="round" markerEnd="url(#arrow)"
+                  strokeDasharray={async ? "5 5" : path ? "10 6" : undefined} className={path ? "evidence-flow" : undefined}>
+              <title>{`${nameOf(e.source)} → ${nameOf(e.target)}: ${fmtRate(r)} requests/s, ${Math.round(err * 100)} % failing`}</title>
             </path>
             {Array.from({ length: dots }, (_, i) => (
-              <circle key={i} r={i < red ? 3.2 : 2.4} fill={i < red ? C.raspberry : C.eucalyptus}>
+              <circle key={i} r={i < red ? 3.2 : 2.3} fill={i < red ? C.raspberry : C.eucalyptus} opacity={0.95}>
                 <animateMotion dur={`${dur}s`} begin={`${(-i * dur) / dots}s`} repeatCount="indefinite" path={d} />
               </circle>
             ))}
@@ -134,40 +220,59 @@ export default function ServiceMap({ graph, overlay, onPick }: { graph: Graph | 
         );
       })}
 
-      {nodes.map((n) => {
-        const p = pos[n.id];
-        const isRoot = root === n.id;
-        const alerting = hot.has(n.id);
-        const ring = overlay.cited?.includes(n.id) ? C.pine : overlay.predicted?.includes(n.id) ? C.plum
-          : overlay.blast?.includes(n.id) ? C.lake : overlay.path?.includes(n.id) && !isRoot ? C.saffron : null;
-        const kind = n.labels.includes("Queue") ? "queue" : n.labels.includes("Datastore") ? "datastore" : "service";
-        const name = NAMES[n.id] ?? n.id.replace(/^(queue|db|cache):/, "");
-        const err = n.err_rate ?? 0;
-        const sub = kind === "queue" ? `queue${n.lag != null ? ` · lag ${Math.round(n.lag)}` : ""}`
-          : `${fmtRate(n.rps)} req/s${err >= 0.005 ? ` · ${Math.round(err * 100)} % err` : ""}`;
-        const dim = incident && !alerting && !isRoot && !overlay.path?.includes(n.id) && !ring;
+      {/* customer cards */}
+      {journeys.map((j) => {
+        const p = jpos[j.id];
+        const js = journeyState(j, root);
+        const hurt = js === "hurt";
+        const failing = 1 - (j.success_rate ?? 1);
+        const tint = hurt ? C.raspberry : js === "risk" ? C.saffron : null;
         return (
-          <g key={n.id} transform={`translate(${p.x},${p.y})`} opacity={dim ? 0.45 : 1} style={{ transition: "opacity .6s" }}
-             className={onPick ? "cursor-pointer" : undefined} onClick={() => onPick?.(n.id)}>
-            {(alerting || isRoot) && <rect x={-4} y={-4} width={W + 8} height={H + 8} rx={14} fill="none"
-                                           stroke={isRoot ? C.raspberry : C.saffron} strokeWidth={2} className="pulse-ring" />}
-            {ring && <rect x={-7} y={-7} width={W + 14} height={H + 14} rx={16} fill="none" stroke={ring} strokeWidth={2.5}
-                           strokeDasharray={ring === C.plum || ring === C.saffron ? "6 4" : undefined} />}
-            <rect width={W} height={H} rx={kind === "datastore" ? 6 : 11}
-                  fill={isRoot ? C.raspberry : alerting ? "#FDF1DC" : C.paper}
-                  stroke={isRoot ? C.raspberry : alerting ? C.saffron : "#C9D3C6"} strokeWidth={alerting || isRoot ? 2 : 1} />
-            <circle cx={13} cy={H / 2} r={5} fill={isRoot ? C.paper : alerting ? C.saffron : err >= 0.01 ? C.saffron : C.eucalyptus} />
-            <text x={25} y={21} fontSize={14.5} fontWeight={600} fill={isRoot ? C.paper : C.pine}>
-              {name.length > 14 ? `${name.slice(0, 13)}…` : name}
+          <g key={j.id} transform={`translate(${p.x},${p.y})`}>
+            {tint && <rect x={-4} y={-4} width={JW + 8} height={JH + 8} rx={14} fill={tint} opacity={0.25} filter="url(#glow)" className="pulse-ring" />}
+            <rect width={JW} height={JH} rx={12} fill={hurt ? "#2A1420" : js === "risk" ? "#2A220E" : C.card} stroke={tint ?? "#2C3B58"} />
+            <text x={14} y={22} fontSize={14} fontWeight={600} fill={C.pine}>{j.name}</text>
+            <text x={14} y={40} fontSize={12} fill={hurt ? "#FDA4AF" : js === "risk" ? "#FCD34D" : C.pineSoft}>
+              {perHour(j.rps)} / hour{hurt ? ` · ${Math.round(failing * 100)} % failing` : js === "risk" ? " · at risk" : ""}
             </text>
-            <text x={25} y={38} fontSize={12} fill={isRoot ? "#FFE3EC" : C.pineSoft}>
-              {kind === "datastore" ? `${n.id.startsWith("cache:") ? "cache" : "db"} · ` : ""}{sub}
-            </text>
-            <title>{`${n.id}\n${fmtRate(n.rps)} requests/s\n${Math.round(err * 1000) / 10} % errors${n.p95_ms != null ? `\np95 ${Math.round(n.p95_ms)} ms` : ""}${alerting ? "\nALERTING" : ""}${isRoot ? "\nROOT CAUSE" : ""}`}</title>
+            <title>{`${j.name}: about ${perHour(j.rps)} requests an hour, ${Math.round((j.success_rate ?? 1) * 100)} % succeed`}</title>
           </g>
         );
       })}
-      <text x={PAD} y={height + 14} fontSize={12} fill={C.pineSoft}>requests flow left → right · line thickness = traffic · red dots = failing requests</text>
+
+      {/* service cards */}
+      {nodes.map((n) => {
+        const p = pos[n.id];
+        if (!p) return null;
+        const isRoot = root === n.id;
+        const alerting = hot.has(n.id);
+        const ring = overlay.cited?.includes(n.id) ? "#FFFFFF" : overlay.predicted?.includes(n.id) ? C.plum
+          : overlay.blast?.includes(n.id) ? C.lake : null;
+        const err = n.err_rate ?? 0;
+        const kind = n.labels.includes("Queue") ? "queue" : n.labels.includes("Datastore") ? "store" : "service";
+        const sub = kind === "queue" ? `${n.id} · lag ${Math.round(n.lag ?? 0)}`
+          : `${n.id.replace(/^(db|cache):/, "")} · ${fmtRate(n.rps)}/s${err >= 0.005 ? ` · ${Math.round(err * 100)}% err` : ""}`;
+        const dim = incident && !alerting && !isRoot && !overlay.path?.includes(n.id) && !ring;
+        const name = nameOf(n.id);
+        return (
+          <g key={n.id} transform={`translate(${p.x},${p.y})`} opacity={dim ? 0.4 : 1} style={{ transition: "opacity .6s" }}>
+            {(alerting || isRoot) && <rect x={-5} y={-5} width={W + 10} height={H + 10} rx={14} fill={isRoot ? C.raspberry : C.saffron}
+                                           opacity={isRoot ? 0.45 : 0.3} filter="url(#glow)" className="pulse-ring" />}
+            {ring && <rect x={-6} y={-6} width={W + 12} height={H + 12} rx={15} fill="none" stroke={ring} strokeWidth={2}
+                           strokeDasharray={ring === C.plum ? "6 4" : undefined} />}
+            <rect width={W} height={H} rx={kind === "store" ? 7 : 11}
+                  fill={isRoot ? "#4C0F22" : alerting ? "#33260C" : C.card}
+                  stroke={isRoot ? C.raspberry : alerting ? C.saffron : "#2C3B58"} strokeWidth={isRoot || alerting ? 1.8 : 1} />
+            <circle cx={13} cy={17} r={4} fill={isRoot ? C.raspberry : alerting ? C.saffron : err >= 0.01 ? C.saffron : C.eucalyptus} />
+            <text x={24} y={21} fontSize={13.5} fontWeight={600} fill={C.pine}>{name.length > 17 ? `${name.slice(0, 16)}…` : name}</text>
+            <text x={12} y={39} fontSize={11} fill={isRoot ? "#FDA4AF" : C.pineSoft} fontFamily="'JetBrains Mono', monospace">
+              {sub.length > 24 ? `${sub.slice(0, 23)}…` : sub}
+            </text>
+            {isRoot && <text x={W - 8} y={-9} fontSize={10.5} fontWeight={700} textAnchor="end" fill={C.raspberry} letterSpacing="0.08em">ROOT CAUSE</text>}
+            <title>{`${name} (${n.id})\n${fmtRate(n.rps)} requests/s\n${Math.round(err * 1000) / 10} % errors${n.p95_ms != null ? `\np95 ${Math.round(n.p95_ms)} ms` : ""}${alerting ? "\nALERTING" : ""}${isRoot ? "\nROOT CAUSE" : ""}`}</title>
+          </g>
+        );
+      })}
     </svg>
   );
 }

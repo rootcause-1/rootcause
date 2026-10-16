@@ -43,7 +43,7 @@ The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If 
 | MCP | Official Python MCP SDK (`mcp`), `FastMCP`, transports: stdio and streamable HTTP |
 | LLM | Anthropic Python SDK, model from env `RC_LLM_MODEL` (default `claude-sonnet-5-5`), temperature 0 |
 | Containers | Docker SDK for Python (`docker`) via mounted `/var/run/docker.sock` |
-| UI | React 18 + Vite + TypeScript, plain SVG service map (the 16 Oct Three.js scene was replaced the same night at Shambhvi's request), Tailwind, SSE (`EventSource`) |
+| UI | React 18 + Vite + TypeScript, plain SVG company map + popup narrator (Three.js scene removed 16 Oct at Shambhvi's request), Tailwind (dark theme, Inter), SSE (`EventSource`) |
 | Tests | `pytest`, `pytest-asyncio`, `ruff`; FalkorDB test container for integration tests |
 | Packaging | `uv` for Python, `pnpm` for UI, `make` for everything |
 
@@ -467,10 +467,9 @@ Pool: paymentFailure, paymentUnreachable, cartFailure, adFailure, productCatalog
 
 ## 11. UI (frontend/)
 
-Single page, light theme, readable at 1080p for the video. Built as a guided story so a first-time viewer understands it.
-- **Live service map** (`components/ServiceMap.tsx`, SVG), left→right tiers, every node labelled with its req/s and error %. Colour = state only: green healthy, amber alerting, red root cause / failing requests; dots along edges follow rps and error rate; evidence path animated; rings: blue = touched by the fix, plum = predicted, dark = cited by an agent step. Health strip above it: KPIs + failing-requests timeline with incident / fix / resolved markers.
-- **Incident story** (`components/Story.tsx`, `FixFlow.tsx`): 7 chapters driven by real state — watching → alerts → one incident → root cause + plain-English reasons + evidence trail + agent steps → who is affected → "Should I fix this?" → review plan → confirm → live step checklist → back to normal + report.
-- **Incident panel**: alert count → "N alerts, 1 incident", ranked hypotheses with stacked bars for the five signals, what-changed card, journey impact bars, similar incidents.
+Single page, dark theme (Inter), readable at 1080p for the video. Built as a self-running, self-explanatory demo.
+- **Company map** (`components/ServiceMap.tsx`, SVG) fills the page: customers (journeys) left → services in team lanes (owner + on call) → shared infrastructure. Colour = state only: green healthy, amber alerting, red root cause / failing requests; dots follow rps and error rate; evidence path animated; rings: blue = touched by the fix, purple = predicted, white = cited by an agent step.
+- **Narrator popups** (`components/Narrator.tsx`): steps unlocked by real state with a minimum read time, a step bar on top, vitals card with a failing-requests timeline. "Start demo" restarts the replay; the fix popup auto-approves low-risk fixes after a visible countdown only in replay autoplay.
 - **Agent trail drawer**: list of `Step`s; hover highlights cited nodes.
 - **Action card**: risk badge, side-effect list, Approve / Reject; typed confirmation for high risk. Approval calls `POST /api/actions/{id}/approve` which mints the token.
 - Tabs: **Chaos lab** (pick fault, Mystery round, run N, live scorecard), **Predict** (what-if → Break it → precision/recall), **Memory**, **Reports**.

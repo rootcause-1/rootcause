@@ -21,9 +21,9 @@ site (same code path, recorded telemetry). Screen: 1920×1080, UI at `localhost:
 | 2:55–3:00 | URL + repo + "FalkorDB · Track 01: Agents That Act on Connected Data". | "RootCause. Try the replay at the link below." |
 
 ## Recording checklist
-- Easiest take: open the public site, click **Run-through from the start**, let the story on the right fill in
-  (alerts → one incident → root cause and why → who is affected), then **Yes, fix it** → **Confirm and apply** and
-  stay on the map while the timeline above it drops back to zero.
+- Easiest take: open the public site, click **Start demo** and do nothing: the popups walk through healthy → alarms →
+  one incident → root cause → impact → "Should I fix this?" (auto-approves after 12 s) → fixing → back to normal,
+  while the map and the failing-requests timeline calm down. Click **Let me decide** to approve by hand on camera.
 - Live: `make demo-up && make up`, wait for "Learning baseline" to finish (3 min), all flags off, no open incidents.
 - Run the fault from Chaos lab (Mystery round) or `uv run python scripts/acceptance_check.py --flag paymentFailure`.
 - Replay alternative: open the public site; the scenario fast-forwards the healthy part and breaks within a minute;
