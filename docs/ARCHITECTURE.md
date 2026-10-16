@@ -49,6 +49,14 @@ histories for slopes, SSE queues, and the replay player's cursor.
    writes the report; a failure re-proposes without the failed action.
 5. In replay mode actions are simulated and the player jumps to the recording's recovery segment if the fix matches.
 
+### M7 UI (rebuilt 16 Oct)
+1. The service graph is a Three.js scene (`frontend/src/scene/Stage.tsx`); `layout.ts` gives stable tiered positions
+   that only change when the topology changes, so 5-second metric updates never make the scene jump.
+2. Colour is state only (eucalyptus / saffron / raspberry); particles per edge follow its rps, raspberry share = error rate.
+3. The Director camera frames the evidence path (centroid + extent) and orbits it; dragging pauses it for 12 s.
+4. The title card states the story in one sentence; the dossier reads top to bottom; Film mode hides the panels.
+5. All data still comes from `GET /api/graph`, `/api/incidents/*` and the SSE stream; no UI-side state is a source of truth.
+
 ### M8 Agent and MCP
 1. `tools.py` implements every tool once; the MCP server, autopilot and the LLM agent share it.
 2. The MCP server reads the graph directly and forwards write tools to the API, so side effects happen in one process.

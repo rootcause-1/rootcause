@@ -43,7 +43,7 @@ The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If 
 | MCP | Official Python MCP SDK (`mcp`), `FastMCP`, transports: stdio and streamable HTTP |
 | LLM | Anthropic Python SDK, model from env `RC_LLM_MODEL` (default `claude-sonnet-5-5`), temperature 0 |
 | Containers | Docker SDK for Python (`docker`) via mounted `/var/run/docker.sock` |
-| UI | React 18 + Vite + TypeScript, Cytoscape.js + `cytoscape-dagre`, Tailwind, SSE (`EventSource`) |
+| UI | React 18 + Vite + TypeScript, Three.js via `@react-three/fiber` + `@react-three/drei` (replaced Cytoscape on 16 Oct, asked for by Yash), Tailwind, SSE (`EventSource`) |
 | Tests | `pytest`, `pytest-asyncio`, `ruff`; FalkorDB test container for integration tests |
 | Packaging | `uv` for Python, `pnpm` for UI, `make` for everything |
 
@@ -468,7 +468,7 @@ Pool: paymentFailure, paymentUnreachable, cartFailure, adFailure, productCatalog
 ## 11. UI (frontend/)
 
 Single page, dark theme, readable at 1080p for the video.
-- **Live graph** (Cytoscape + dagre, left→right tiers: edge → core → data/queues). Edge colour by err_rate (green < 1%, amber < 5%, red ≥ 5%), width by rps. `:Anomalous` nodes pulse. Overlays: evidence path (animated), prediction (dashed), blast radius (halo).
+- **Live graph** — now a bright Three.js diorama (`frontend/src/scene/`), left→right tiers. Colour = state only: eucalyptus healthy, saffron alerting, raspberry root cause; traffic particles follow rps and error rate; BLAMES arcs, evidence pulse, root beacon, heal wave; Director camera (D) and Film mode (F). Prediction = plum rings, cited nodes = pine rings.
 - **Incident panel**: alert count → "N alerts, 1 incident", ranked hypotheses with stacked bars for the five signals, what-changed card, journey impact bars, similar incidents.
 - **Agent trail drawer**: list of `Step`s; hover highlights cited nodes.
 - **Action card**: risk badge, side-effect list, Approve / Reject; typed confirmation for high risk. Approval calls `POST /api/actions/{id}/approve` which mints the token.
@@ -558,6 +558,8 @@ its own handler errored even on 4xx; detector watches the worst route's error ra
 work; sparse windows are `no_data` (hold alert state); latency needs ≥ 10 requests and must beat baseline + 3σ; lag
 must grow 30 s; CPU must hold 30 s; JVM GC-pressure rule; superseded / baseline-restoring changes are not causes;
 diagnosis frozen while verifying; reports render the verdict snapshot; recordings start with a flag snapshot.
+
+**Handoff for the team: `HANDOFF.md`** (status, how to run, what is left, gotchas).
 
 **Do next** (feature freeze 18 Oct 2 PM IST):
 1. When the chaos batch finishes: put its numbers into README "Scorecard" (copy from docs/SCORECARD.md, never type).

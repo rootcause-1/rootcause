@@ -7,7 +7,7 @@ approval, verifies recovery, writes the report and remembers the incident.
 **Track:** Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB) — *Agents That Act on Connected Data*
 **Demo video:** _TODO: add YouTube link_ · **Live (replay) deployment:** http://3.234.90.242/ (AWS, replay mode — see [docs/DEPLOY.md](docs/DEPLOY.md))
 
-Architecture diagram and how each part works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Architecture diagram and how each part works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Picking this up? Start with [HANDOFF.md](HANDOFF.md).
 
 ![RootCause during a live paymentFailure: 4 alerts become 1 incident, evidence path highlighted on the graph, low-risk fix proposed](docs/img/ui-incident.jpg)
 

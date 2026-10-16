@@ -1,90 +1,148 @@
-# Handoff: Docker testing (for Yash)
+# Handoff — where RootCause stands and how to continue
 
-Hi Yash, everything in this repo is coded but **nothing has run against Docker yet** (the machine it was written
-on has no Docker). Your job is to get it running, fix what breaks, and tick the acceptance checks in
-[docs/PROGRESS.md](docs/PROGRESS.md). Rules for the repo are in [CLAUDE.md](CLAUDE.md); read §0 and §12 first.
+Written 16 Oct 2026 by Yash (with Claude Code). Read this first, then `CLAUDE.md` §0 (rules) and §16 (state).
 
-Feature freeze: **18 Oct, 2:00 PM IST**.
+**Deadlines:** feature freeze **18 Oct, 2:00 PM IST** · submission **18 Oct, 11:59 PM IST**
+(Graph Hacks, FalkorDB, Track 01: *Agents That Act on Connected Data*).
 
-## What's verified so far
-- `ruff check backend tests scripts`: clean
-- `pytest tests/unit`: 46 passed
-- `cd frontend && npm run build`: builds
-- `pytest tests/graph` (82 tests) and `tests/scenarios`: **skipped, never run** (they need Docker)
+---
 
-The 73 Cypher queries in `backend/rootcause/graph/queries/` have never touched FalkorDB. Expect some to fail.
+## 1. Where things stand
 
-## Setup
-Needs Docker, Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 22, and about 8 GB of free RAM (the demo alone uses ~6 GB).
+Everything below runs and is on `main`. Nothing is half-merged; there are no other branches.
 
+| Area | State | Evidence |
+|---|---|---|
+| Live integration with the real OpenTelemetry Demo | works end to end | `docs/PROGRESS.md` (M0–M11, outputs pasted) |
+| Acceptance checks M0–M7, M9–M11 | pass | `docs/PROGRESS.md` |
+| M8 (MCP) | MCP server verified with an MCP client over HTTP and stdio; the **Claude Desktop** check itself is still open | `scripts/mcp_smoke.py` |
+| Every catalogue fault broken by hand | 15 / 16 ranked first after general fixes, 16 / 16 in the top three | comments in `backend/rootcause/chaos/catalogue.yaml`, table in `docs/PROGRESS.md` |
+| Blind chaos scorecard (15 random faults) | RootCause **87 % top-1 / 93 % top-3**, median 53 s; alert heuristics 40 %; graph signals off 80 % | `docs/SCORECARD.md`, history in `docs/scorecards/` |
+| Replay recordings | 6 scenarios recorded from the live demo; `make scenario-test` 6 / 6 | `replay/*.jsonl.gz` |
+| Public demo | **http://3.234.90.242/** (AWS, replay mode), redeploys itself from `main` | `docs/DEPLOY.md` |
+| UI | rebuilt as a bright Three.js 3D scene (just finished) | `frontend/src/scene/` |
+| Tests | `make lint test` → 162 passed | – |
+
+The two known misses (both honest, both documented): `productCatalogLockContention` ranks the database first and the
+real cause second; `kafkaQueueProblems` floods the database, which forms its own incident.
+
+---
+
+## 2. What is left (in priority order)
+
+1. **Record the demo video** (≤ 3 min) with `docs/DEMO_SCRIPT.md`. Easiest: open the public site, press **F** (Film
+   mode), leave **Director** on, wait ~40 s for "5 alerts became 1 incident", then show the panel and click
+   **Approve**. Put the link in `README.md` (search for `TODO: add YouTube link`).
+2. **README team section**: Yash wrote a draft; fix it to say who did what (`## Team` in `README.md`).
+3. **Claude Desktop check** (closes M8): paste the snippet from README "Use it from Claude Desktop" into
+   `claude_desktop_config.json`, with the stack running, and ask "Who owns payment?". Paste the answer into
+   `docs/PROGRESS.md` under M8 and tick it.
+4. *Optional*: an `ANTHROPIC_API_KEY` in `.env` enables `RC_AGENT_MODE=llm` and the `llm_no_graph` baseline. If you
+   add it, re-run `make chaos N=15` so the scorecard includes that column (never type numbers by hand).
+5. *Optional polish*: the UI is tuned for laptop/desktop and video, not phones; the Reports/Memory tabs are simple.
+6. **After judging**: shut down the AWS instance (commands in `docs/DEPLOY.md`; Yash has the AWS access).
+
+Do not start big new features before the freeze. If something breaks, fix it the general way (no flag-specific code)
+and keep `make lint test` and `make scenario-test` green.
+
+---
+
+## 3. Run it
+
+### A. Just look at it (no setup)
+Open http://3.234.90.242/. The healthy part of a recorded fault fast-forwards, the fault plays live, approve the
+low-risk fix to see recovery. It starts over by itself. `POST /api/admin/reset` restarts it.
+
+### B. Work on the UI against the public site (fastest loop, no Docker)
 ```bash
-uv sync                           # Python deps (mcp is pinned <2 on purpose)
-cp .env.example .env              # ANTHROPIC_API_KEY is optional (autopilot works without it)
+cd frontend && npm install
+RC_API=http://3.234.90.242 npm run dev        # http://localhost:5173, proxies /api to the public replay site
+```
+Keys: **F** film mode, **D** director, **Esc** exit; drag to orbit, click a node.
+
+### C. Replay stack locally (Docker, no OTel demo, ~1 GB RAM)
+```bash
+make replay-up                                 # http://localhost:8088
 ```
 
-## Step 1: graph tests (do this first, ~30 min)
-These start a FalkorDB test container themselves; no demo is needed.
+### D. The real thing: live on the OpenTelemetry Demo (Docker, ~8 GB RAM)
 ```bash
-uv run pytest tests/graph -q
-```
-Fix every failing `.cypher` file before anything else. Likely trouble spots (FalkorDB is not Neo4j):
-- `SET n:Anomalous` / `REMOVE n:Anomalous` in `create_alert` / `resolve_alert`
-  (fallback if unsupported is in CLAUDE.md §6)
-- `SET n += r.props` in `set_node_props`, `set_incident_props`, `set_action_props`
-- the `shortestPath` form in `evidence_path` (fallback: `algo.SPpaths`)
-- `algo.WCC` / `algo.pageRank` / `algo.betweenness` / `algo.bfs` call signatures
-- map literals inside `collect({...})` and `DISTINCT` on maps in `get_incident`
-
-If you change a query's purpose, run `uv run python scripts/gen_queries_doc.py` to refresh `docs/QUERIES.md`.
-
-## Step 2: bring up the demo and our stack
-```bash
-make demo-up       # clones ../opentelemetry-demo, copies infra/otelcol-config-extras.yml, runs make start-agentic
-make up            # falkordb (:6380, browser :3300), api (:8000 + OTLP :4318), mcp (:8811), ui (:8088)
+uv sync && cp .env.example .env
+make demo-up      # clones ../opentelemetry-demo, installs our collector override, LOCUST_USERS=12, agentic mode
+make up           # FalkorDB (:6380, browser :3300), API (:8000), MCP (:8811), UI (:8088)
 make seed
+open http://localhost:8088                     # wait 3 min while baselines are learned
+uv run python scripts/acceptance_check.py --flag paymentFailure --approve   # break, watch, approve, verify
 ```
-If the demo isn't at `../opentelemetry-demo`, set `DEMO_REPO_ABS` (absolute path) in `.env`; compose paths
-are relative to `infra/`.
+Useful while live: `POST /api/admin/reset` (fresh graph, re-learn), `make chaos N=15` (blind batch, ~3 h),
+`make record SCENARIO=<flag>` (one recording, ~10 min), `make scenario-test`.
 
-## Step 3: VERIFY items (write the real values into `config/rootcause.yaml`)
-Each is listed in CLAUDE.md §5 and `docs/PROGRESS.md`. Several are guesses right now:
-- [ ] Collector logs: is the exporter type `otlp_http` or `otlphttp`, and is `encoding: json` accepted?
-      (The API accepts protobuf too, so dropping `encoding` is fine if it isn't supported.)
-- [ ] `docker network ls`: is the demo network `opentelemetry-demo`? (compose: `DEMO_NETWORK`)
-- [ ] API log shows span batches arriving; `curl localhost:8000/api/status` shows `spans_received` going up
-- [ ] Prometheus host/port inside the network; run `uv run python scripts/discover_metrics.py --url ...`
-      and fill `prometheus.queries` (Kafka lag, runtime memory)
-- [ ] flagd file name in `src/flagd/` (we assume `demo.flagd.json`) and whether hand edits hot-reload
-- [ ] Real flag names and variant names → fix `backend/rootcause/chaos/catalogue.yaml`
-      (`productCatalogLockContention`, `intlShippingSlowdown`, `kafkaConsumerDead`, `aiRunawayAgent`,
-      `aiSlowResponse` are guesses)
-- [ ] Agent service URL for `POST /prompt` (read `compose.agent.yaml`); do AI flags work with `USE_VCR=True`?
-- [ ] Service names in Jaeger match `config/seed.yaml` (team ownership) and journey routes match the real routes
-- [ ] Do spans carry `feature_flag.key`?
+---
 
-## Step 4: acceptance checks M1–M8 (see docs/PROGRESS.md for the exact check per milestone)
-Baselines take 3 minutes to learn after the API starts (the UI header counts down).
-1. Graph in FalkorDB Browser (localhost:3300): ≥ 12 services, frontend → checkout → payment
-2. Flip a flag by hand → a `Change` node within 5 s
-3. `paymentFailure` on → alerts on payment/checkout/frontend within 30 s → one incident, top-1 `payment`
-4. `paymentUnreachable` → top-1 `edge:checkout->payment`
-5. Approve the flag revert in the UI (localhost:8088) → incident resolved, report in `reports/`
-6. MCP: point Claude Desktop at the server (README has the config) and ask "who owns payment?"
+## 4. Map of the code
 
-Paste each check's output under its row in `docs/PROGRESS.md` and tick it. Commit after each green check.
-
-## Step 5: before M10
-Break **every** catalogue flag once by hand. In `catalogue.yaml` comments, write which alerts and nodes you saw.
-Report any fault RootCause can't see (the CPU, memory, Kafka and AI faults are the most likely). Then:
-```bash
-make record SCENARIO=paymentFailure    # ~8 min each; record a few key scenarios
-make chaos N=15                         # writes docs/SCORECARD.md
-make scenario-test
+```
+backend/rootcause/
+  ingest/      otlp.py (OTLP JSON/protobuf, gzip) · spans.py (window → calls, routes, journeys, flag evals)
+               pipeline.py (single entry for live + replay) · prom.py · docker_stats.py · flag_watcher.py · tick.py (5 s loop)
+  detect/      rules.py (alert rules, hysteresis, no-data) · baselines.py (EWMA on graph nodes)
+  engine/      core.py (BLAMES → WCC → ranking) · ranking.py · edge_cause.py · changes.py · impact.py · evidence.py
+               predict.py · safety.py · memory.py
+  actions/     service.py (propose/approve/execute) · flagd.py · containers.py · pager.py · verify.py · report.py
+  agent/       autopilot.py (default) · loop.py (LLM over MCP) · trail.py (Step nodes)
+  mcp_server/  server.py (16 tools)
+  chaos/       runner.py · baselines.py · scorecard.py · catalogue.yaml (truths + what we saw)
+  replay/      recorder.py · player.py (warm-up, loop, give up after 3 unattended loops)
+  graph/       queries/*.cypher (76 named queries; docs/QUERIES.md is generated from their headers)
+frontend/src/
+  scene/       Stage.tsx (Three.js: nodes, edges, traffic particles, blame arcs, evidence pulse, beacon,
+               heal wave, Director camera) · layout.ts (tiered 3D layout) · palette.ts
+  components/  TitleCard.tsx (the big headline) · IncidentPanel.tsx · ActionCard.tsx · TrailDrawer.tsx
+  tabs/        ChaosLab · Predict · Memory · Reports
+config/        rootcause.yaml (every threshold, with a comment saying why) · seed.yaml (invented teams/runbooks)
+scripts/       acceptance_check.py · record_scenario.py · mcp_smoke.py · deploy_aws.sh · sync_readme_scorecard.py
+               backfill_flag_snapshot.py (one-off, documented) · setup_demo.sh
+infra/         docker-compose.yml (live) · docker-compose.replay.yml (public) · autodeploy/ (timer on the AWS host)
 ```
 
-## Known deviations from CLAUDE.md
-Listed at the bottom of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): no temperature 0 for Sonnet 5.5,
-`journey:` id prefix, the 10%-of-baseline edge-cause check, npm instead of pnpm, `mcp<2`.
+---
 
-## Also missing (not your job, but FYI)
-`docs/PRD.md` (needs exporting), the demo video, public replay deployment, README links/team section.
+## 5. Deploying
+
+**Pushing to `main` deploys the public site** within ~2 minutes (a systemd timer on the host pulls `origin/main`
+and rebuilds; only changed images restart). Check it with `curl http://3.234.90.242/api/status`.
+SSH access (`scripts/deploy_aws.sh`) needs the key that is only on Yash's laptop; you should not need it.
+Host details and teardown: `docs/DEPLOY.md`.
+
+---
+
+## 6. Rules you must keep (from CLAUDE.md §0)
+
+- FalkorDB is the only database; every graph query is a named `.cypher` file (run `make queries-doc` after adding one).
+- The engine never reads the flagd config or the catalogue to decide a cause. No flag-specific code.
+- Scorecard numbers are generated: `make chaos`, then `uv run python scripts/sync_readme_scorecard.py` for the README.
+- Append a line to `docs/AI_DISCLOSURE.md` for every module you (or an AI assistant) change.
+- `make lint test` before every commit; `make scenario-test` after any detection/engine change.
+
+---
+
+## 7. Gotchas we learned the hard way
+
+- **Keep the laptop awake, lid open, plugged in** during live runs. A sleeping Mac pauses the Docker VM and silently
+  corrupts runs (we lost a sweep this way).
+- Rebuild one service with `--no-deps` (`docker compose ... up -d --build --no-deps rootcause-api`), or compose also
+  restarts the API and it re-learns baselines.
+- After code changes to detection, reset the live graph (`POST /api/admin/reset`) so baselines are clean.
+- The demo's default 5 load-generator users are too few (checkout ~2 req/min); `make demo-up` sets 12.
+- `productCatalogFailure` is switched through its targeting rule, not `defaultVariant` (we match the demo's flag UI).
+- `emailMemoryLeak` is scored at 1000x; 100x never crosses a sane threshold within minutes.
+- Browser caching: the UI's nginx sends `no-cache` for `index.html`; if you see an old UI, hard-reload.
+- SSH to the AWS host is flaky from some home networks; deploys don't need SSH.
+- More detail on every detection rule and why it exists: `docs/ARCHITECTURE.md` ("What the real demo taught us").
+
+---
+
+## 8. Ask for help
+
+Everything the engine decided during the live runs is in the FalkorDB graph (`rc_live`, browser at
+http://localhost:3300 when the live stack is up), and every check's raw output is in `docs/PROGRESS.md`.
