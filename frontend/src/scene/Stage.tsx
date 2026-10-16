@@ -55,6 +55,13 @@ function Scene({ graph, focus, director, incidentOpen, picked, onPick, frame = 1
   }, [graph]);
   const [hover, setHover] = useState<string | null>(null);
   const root = rootNode(focus.root);
+  // when the root cause goes away (fixed), send a healing wave out from where it was
+  const lastRoot = useRef<string | null>(null);
+  const [heal, setHeal] = useState<{ at: P3; key: number } | null>(null);
+  useEffect(() => {
+    if (lastRoot.current && !root && pos[lastRoot.current]) setHeal({ at: pos[lastRoot.current], key: performance.now() });
+    lastRoot.current = root;
+  }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
   const rootEdge = focus.root?.startsWith("edge:") ? focus.root.slice(5) : null;
   const nodes = graph?.nodes.filter((n) => pos[n.id]) ?? [];
   const tierOf = (p: P3) => p[0];
@@ -82,6 +89,7 @@ function Scene({ graph, focus, director, incidentOpen, picked, onPick, frame = 1
               hovered={hover === n.id} picked={picked === n.id}
               onHover={setHover} onPick={onPick} />
       ))}
+      {heal && !reduced && <HealWave key={heal.key} at={heal.at} onDone={() => setHeal(null)} />}
       <Director pos={pos} focusIds={picked ? [picked] : root ? [...(focus.path ?? []), root] : []} director={director} frame={frame} />
     </>
   );
@@ -348,6 +356,32 @@ function EvidencePulse({ path, pos }: { path: string[]; pos: Record<string, P3> 
         </>
       )}
     </>
+  );
+}
+
+function HealWave({ at, onDone }: { at: P3; onDone: () => void }) {
+  const rings = useRef<THREE.Group>(null);
+  const t0 = useRef(performance.now());
+  useFrame(() => {
+    const g = rings.current;
+    if (!g) return;
+    const t = (performance.now() - t0.current) / 2600;
+    if (t >= 1) { onDone(); return; }
+    g.children.forEach((m, i) => {
+      const k = Math.max(0, t - i * 0.12);
+      m.scale.setScalar(0.5 + easeOut(k) * 34);
+      ((m as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - k);
+    });
+  });
+  return (
+    <group ref={rings} position={[at[0], 0.03, at[2]]}>
+      {[0, 1, 2].map((i) => (
+        <mesh key={i} rotation-x={-Math.PI / 2}>
+          <ringGeometry args={[0.96, 1, 96]} />
+          <meshBasicMaterial color={C.eucalyptus} transparent depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
