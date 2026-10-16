@@ -5,7 +5,7 @@ Each tick: flush the span window to the graph -> detector (alerts, :Anomalous, b
 Live mode also runs the input sources (flagd watcher, Prometheus, docker stats/events); replay mode runs the
 replay player instead. Both feed the same Pipeline.
 
-Queries used directly: open_incidents, set_incident_props, graph_nodes, graph_edges (others via the components).
+Queries used directly: open_incidents, set_incident_props, graph_nodes, graph_edges, graph_journeys, graph_teams (others via the components).
 """
 
 from __future__ import annotations
@@ -115,7 +115,14 @@ class Runtime:
         return {"spans": st.span_count, "detector": det, "incidents": summaries}
 
     async def graph_snapshot(self) -> dict[str, Any]:
-        return {"nodes": await self.db.run("graph_nodes"), "edges": await self.db.run("graph_edges")}
+        snap: dict[str, Any] = {"nodes": await self.db.run("graph_nodes"), "edges": await self.db.run("graph_edges")}
+        for key, query in (("journeys", "graph_journeys"), ("teams", "graph_teams")):
+            try:  # context for the UI only: never let it break the tick
+                snap[key] = await self.db.run(query)
+            except Exception as exc:
+                log.warning("%s failed: %s", query, exc)
+                snap[key] = []
+        return snap
 
     def status(self) -> dict[str, Any]:
         return {"mode": self.s.rc_mode, "graph": self.db.name, "tick": self.tick_n, "tick_ts": self.last_tick_ms,

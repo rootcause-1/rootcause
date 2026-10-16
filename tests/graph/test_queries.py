@@ -214,3 +214,15 @@ async def test_propose_reverts_change_on_a_runner_up_suspect(db):
     reverts = [a for a in out["actions"] if a["kind"] == "flag_revert"]
     assert [a["target"] for a in reverts] == ["paymentFailure"] and reverts[0]["risk"] == "low"
     assert "suspect #2" in reverts[0]["reason"]
+
+
+async def test_ui_snapshot_journeys_and_teams(db):
+    await fixtures.build(db)
+    journeys = {r["id"]: r for r in await db.run("graph_journeys")}
+    checkout = journeys["journey:checkout"]
+    assert set(checkout["needs"]) == set(FAILING)
+    assert checkout["success_rate"] == pytest.approx(0.4) and checkout["baseline"] == pytest.approx(0.99)
+    assert journeys["journey:browse"]["needs"] == []  # seeded, no traffic yet
+    teams = {r["id"]: r for r in await db.run("graph_teams")}
+    assert "payment" in teams["payments-team"]["owns"]
+    assert teams["payments-team"]["on_call"] == ["Asha Rao"]
