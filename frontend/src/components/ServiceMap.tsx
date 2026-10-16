@@ -52,9 +52,11 @@ function layout(nodes: GraphNode[], edges: GraphEdge[], teams: Team[], journeys:
   const owner: Record<string, Team> = {};
   for (const t of teams) for (const s of t.owns) owner[s] = t;
   const laneOf = (n: GraphNode) => (n.labels.includes("Service") && owner[n.id] ? owner[n.id].name : INFRA);
-  const order = [...teams.map((t) => t.name), INFRA];
   const lanes: Record<string, GraphNode[]> = {};
   for (const n of nodes) (lanes[laneOf(n)] ??= []).push(n);
+  // customer-facing teams first: order lanes by the earliest tier of their services, infrastructure last
+  const first = (lane: string) => Math.min(...(lanes[lane] ?? []).map((n) => tier[n.id]), 99);
+  const order = [...teams.map((t) => t.name).sort((a, b) => first(a) - first(b) || a.localeCompare(b)), INFRA];
 
   const sx = PAD + JW + GAP;
   const pos: Record<string, Box> = {};
