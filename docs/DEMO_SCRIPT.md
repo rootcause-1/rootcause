@@ -21,6 +21,9 @@ site (same code path, recorded telemetry). Screen: 1920×1080, UI at `localhost:
 | 2:55–3:00 | URL + repo + "FalkorDB · Track 01: Agents That Act on Connected Data". | "RootCause. Try the replay at the link below." |
 
 ## Recording checklist
+- Press **F** for Film mode (hides the panels, keeps the 3D stage and the title card) and leave **Director** on (**D**):
+  the camera frames the evidence path by itself, then pulls back with a healing wave when the fix is verified.
+  Esc leaves Film mode. Drag to orbit, click a node for its numbers.
 - Live: `make demo-up && make up`, wait for "Learning baseline" to finish (3 min), all flags off, no open incidents.
 - Run the fault from Chaos lab (Mystery round) or `uv run python scripts/acceptance_check.py --flag paymentFailure`.
 - Replay alternative: open the public site; the scenario fast-forwards the healthy part and breaks within a minute;

@@ -136,7 +136,7 @@ function Node({ n, p, start, delay, isRoot, onPath, cited, predicted, dim, hover
   const kind = n.labels.includes("Queue") ? "queue" : n.labels.includes("Datastore") ? "store" : "service";
   const size = 0.34 + 0.11 * Math.log10(1 + (n.rps ?? 0) * 4);
   const target = useMemo(() => new THREE.Color(
-    isRoot ? C.raspberry : anomalous ? C.saffron : dim ? "#CFE0D4" : kind === "service" ? C.eucalyptus : "#8FB9A3"), [isRoot, anomalous, dim, kind]);
+    isRoot ? C.raspberry : anomalous ? C.saffron : dim ? "#AFD3BD" : kind === "service" ? C.eucalyptus : "#8FB9A3"), [isRoot, anomalous, dim, kind]);
 
   useFrame((state, dt) => {
     const g = group.current;
