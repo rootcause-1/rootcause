@@ -23,43 +23,47 @@ export default function ChaosLab({ status, runs }: { status: Status | null; runs
   const t3 = runs.length ? runs.filter((r) => r.top3).length / runs.length : 0;
 
   return (
-    <div className="grid grid-cols-3 gap-4 p-4">
-      <div className="card space-y-3">
-        <div className="label">Break something</div>
-        {!live && <p className="text-sm text-amber-300">Chaos runs need live mode (the real demo).</p>}
-        <select className="w-full rounded border border-slate-700 bg-slate-950 p-1.5 text-sm" value={flag}
-                onChange={(e) => setFlag(e.target.value)}>
-          <option value="">pick a fault…</option>
+    <div className="space-y-6">
+      <header>
+        <h2 className="font-display text-3xl font-bold tracking-tight">Break something</h2>
+        <p className="mt-1 max-w-[60ch] muted">Flip one of the demo's fault flags and watch RootCause find it. A mystery round
+          picks the fault at random and does not tell you which.</p>
+      </header>
+      {!live && <p className="rounded-xl bg-saffron/15 px-3 py-2 text-sm">Chaos runs need live mode, with the real OpenTelemetry Demo running.</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <select className="field" value={flag} onChange={(e) => setFlag(e.target.value)} aria-label="Fault to inject">
+          <option value="">Pick a fault…</option>
           {cat.map((c) => <option key={c.flag} value={c.flag}>{c.flag} ({c.class})</option>)}
         </select>
-        <div className="flex gap-2">
-          <button className="btn-primary" disabled={!live || !flag || chaos?.running} onClick={() => go({ n: 1, flag })}>Break it</button>
-          <button className="btn-ghost" disabled={!live || chaos?.running} onClick={() => go({ n: 1, mystery: true })}>Mystery round</button>
-        </div>
-        <div className="flex items-center gap-2">
-          <input type="number" min={1} max={50} value={n} onChange={(e) => setN(+e.target.value)}
-                 className="w-20 rounded border border-slate-700 bg-slate-950 p-1 text-sm" />
-          <button className="btn-ghost" disabled={!live || chaos?.running} onClick={() => go({ n })}>Run {n} blind</button>
-        </div>
-        {chaos?.running && <p className="text-sm text-sky-300">running {chaos.done}/{chaos.total} · {chaos.current}</p>}
-        {err && <p className="text-sm text-red-400">{err}</p>}
+        <button className="btn-primary" disabled={!live || !flag || chaos?.running} onClick={() => go({ n: 1, flag })}>Break it</button>
+        <button className="btn-ghost" disabled={!live || chaos?.running} onClick={() => go({ n: 1, mystery: true })}>Mystery round</button>
+        <span className="mx-2 h-6 w-px bg-pine/15" aria-hidden />
+        <input type="number" min={1} max={50} value={n} onChange={(e) => setN(+e.target.value)} className="field w-20" aria-label="Number of blind runs" />
+        <button className="btn-ghost" disabled={!live || chaos?.running} onClick={() => go({ n })}>Run {n} blind</button>
       </div>
-      <div className="card col-span-2">
-        <div className="label mb-2">Scorecard (this session) — top-1 {Math.round(t1 * 100)}% · top-3 {Math.round(t3 * 100)}%</div>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-slate-400"><tr><th>run</th><th>fault</th><th>truth</th><th>verdict</th><th>top-1</th><th>time</th></tr></thead>
-          <tbody>
-            {runs.map((r) => (
-              <tr key={r.id} className="border-t border-slate-800">
-                <td className="font-mono text-xs">{r.id}</td><td>{r.flag}</td><td className="font-mono">{r.truth}</td>
-                <td className="font-mono">{r.verdict ?? "-"}</td><td>{r.top1 ? "✅" : r.top3 ? "🟡" : "❌"}</td>
-                <td>{r.ttd_ms ? `${Math.round(r.ttd_ms / 1000)} s` : "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {runs.length === 0 && <p className="mt-2 text-sm text-slate-400">No runs yet. Full history: docs/SCORECARD.md</p>}
-      </div>
+      {chaos?.running && <p className="text-sm">Running {chaos.done} of {chaos.total}{chaos.current ? `: ${chaos.current}` : ""}.</p>}
+      {err && <p className="text-sm text-raspberry">{err}</p>}
+
+      <section>
+        <h3 className="section-title">This session</h3>
+        {runs.length > 0 && (
+          <p className="mb-3 font-display text-4xl font-bold">{Math.round(t1 * 100)} % <span className="text-lg font-medium muted">found first, {Math.round(t3 * 100)} % in the top three</span></p>
+        )}
+        {runs.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs muted"><tr><th className="py-1">Fault</th><th>Truth</th><th>RootCause said</th><th>Found</th><th>Time</th></tr></thead>
+            <tbody>
+              {runs.map((r) => (
+                <tr key={r.id} className="border-t border-pine/10">
+                  <td className="py-1.5">{r.flag}</td><td>{r.truth}</td><td className="font-medium">{r.verdict ?? "nothing"}</td>
+                  <td className={r.top1 ? "text-pine" : r.top3 ? "text-saffron" : "text-raspberry"}>{r.top1 ? "first" : r.top3 ? "top three" : "missed"}</td>
+                  <td>{r.ttd_ms ? `${Math.round(r.ttd_ms / 1000)} s` : "–"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : <p className="text-sm muted">No runs yet in this session. The full blind scorecard is in docs/SCORECARD.md.</p>}
+      </section>
     </div>
   );
 }

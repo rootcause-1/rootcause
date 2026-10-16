@@ -1,16 +1,22 @@
-// One proposed action: risk badge, side effects, Approve / Reject. High risk needs typed confirmation.
+// One proposed action: what it does, its risk and side effects, Approve / Reject.
+// High risk needs the typed confirmation (e.g. "RESTART payment").
 import { useState } from "react";
 import type { Action } from "../api";
 import { api } from "../api";
 
-const RISK: Record<string, string> = { none: "bg-slate-600", low: "bg-emerald-700", medium: "bg-amber-600", high: "bg-red-700" };
+const RISK: Record<string, string> = {
+  none: "bg-mist text-pine", low: "bg-eucalyptus/20 text-pine", medium: "bg-saffron/20 text-pine", high: "bg-raspberry/15 text-raspberry",
+};
+const VERB: Record<string, string> = { flag_revert: "Revert flag", restart: "Restart", page: "Page" };
+const DONE: Record<string, string> = { executed: "Applied, watching recovery…", verified: "Applied and verified: it recovered.",
+  failed: "Applied, but it did not recover.", approved: "Approved, applying…" };
 
-export default function ActionCard({ a, onChanged }: { a: Action; onChanged: () => void }) {
+export default function ActionCard({ a, onChanged, closed }: { a: Action; onChanged: () => void; closed?: boolean }) {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const phrase = a.risk === "high" ? `RESTART ${a.target}` : null;
-  const proposed = a.status === "proposed";
+  const proposed = a.status === "proposed" && !closed;
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setErr(null);
@@ -18,33 +24,34 @@ export default function ActionCard({ a, onChanged }: { a: Action; onChanged: () 
   }
 
   const se = a.side_effects ?? {};
+  const verb = VERB[a.kind] ?? a.kind.replace("_", " ");
   return (
-    <div className="card">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">{a.kind.replace("_", " ")} <span className="font-mono">{a.target}</span></span>
-        <span className={`rounded px-2 py-0.5 text-xs ${RISK[a.risk] ?? "bg-slate-600"}`}>risk {a.risk}</span>
+    <div className={`rounded-2xl border p-3.5 ${a.rank === 1 && proposed ? "border-pine/30 bg-paper" : "border-pine/10 bg-porcelain/60"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[15px] font-semibold">{verb} {a.target}</span>
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${RISK[a.risk] ?? "bg-mist"}`}>{a.risk} risk</span>
       </div>
-      <p className="mt-1 text-xs text-slate-300">{a.reason}</p>
-      {se.reason && <p className="text-xs text-slate-400">{se.reason}</p>}
+      <p className="mt-1 text-sm muted">{a.reason}</p>
       {(se.affected_services?.length ?? 0) > 0 && (
-        <p className="text-xs text-slate-400">affects: {se.affected_services!.join(", ")}
-          {se.affected_journeys?.length ? ` · journeys ${se.affected_journeys.join(", ")}` : ""}
-          {se.stateful ? " · stateful" : ""}</p>
+        <p className="mt-0.5 text-xs muted">Touches {se.affected_services!.join(", ")}
+          {se.affected_journeys?.length ? `; journeys ${se.affected_journeys.map((j) => j.replace("journey:", "")).join(", ")}` : ""}
+          {se.stateful ? "; holds state" : ""}.</p>
       )}
       {proposed ? (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2">
           {phrase && (
-            <input className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-xs"
-                   placeholder={`type ${phrase}`} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <input className="field min-w-0 flex-1" aria-label={`Type ${phrase} to confirm`}
+                   placeholder={`Type ${phrase} to confirm`} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           )}
           <button className="btn-primary" disabled={busy || (!!phrase && confirm !== phrase)}
-                  onClick={() => run(() => api.approve(a.id, phrase ? confirm : undefined))}>Approve</button>
+                  onClick={() => run(() => api.approve(a.id, phrase ? confirm : undefined))}>Approve {verb.toLowerCase()}</button>
           <button className="btn-ghost" disabled={busy} onClick={() => run(() => api.reject(a.id))}>Reject</button>
         </div>
       ) : (
-        <p className="mt-2 text-xs text-sky-300">status: {a.status}</p>
+        <p className={`mt-2 text-sm font-medium ${a.status === "failed" ? "text-raspberry" : "text-pine"}`}>
+          {a.status === "proposed" && closed ? "Not needed: the incident is resolved." : DONE[a.status] ?? a.status}</p>
       )}
-      {err && <p className="mt-1 text-xs text-red-400">{err}</p>}
+      {err && <p className="mt-1 text-sm text-raspberry">{err}</p>}
     </div>
   );
 }

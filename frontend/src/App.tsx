@@ -1,10 +1,12 @@
-// RootCause UI: header (LIVE/REPLAY, graph, tick), live graph + incident panel + agent trail, and the tabs.
-import { useCallback, useEffect, useState } from "react";
+// RootCause UI: the 3D stage fills the window; a header, the title card, the incident dossier and the other tabs
+// float over it on paper sheets. "Director" lets the camera follow the incident; "Film" (key F) hides the chrome
+// for recording the demo.
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Graph, Incident, Status } from "./api";
-import { api, clock, subscribe } from "./api";
-import GraphView, { type Overlays } from "./components/GraphView";
+import { api, subscribe } from "./api";
 import IncidentPanel from "./components/IncidentPanel";
-import TrailDrawer from "./components/TrailDrawer";
+import TitleCard from "./components/TitleCard";
+import Stage from "./scene/Stage";
 import ChaosLab, { type ChaosRun } from "./tabs/ChaosLab";
 import Memory from "./tabs/Memory";
 import Predict from "./tabs/Predict";
@@ -15,12 +17,12 @@ type Tab = (typeof TABS)[number];
 
 // what a first-time visitor of the public replay site should know in each phase
 const REPLAY_HINT: Record<string, string> = {
-  warming: "fast-forwarding healthy traffic to learn baselines…",
-  healthy: "healthy traffic…",
-  broken: "a fault is live — watch the alerts become one incident, then approve the low-risk fix →",
-  recovery: "fix applied — watching recovery",
-  finished: "done — the scenario restarts in about 2 minutes",
-  expired: "nobody approved a fix — restarting the scenario…",
+  warming: "Fast-forwarding healthy traffic to learn the baselines.",
+  healthy: "Healthy traffic.",
+  broken: "A fault is live. Watch the alerts collapse into one incident, then approve the fix.",
+  recovery: "Fix applied. Watching the shop recover.",
+  finished: "Recovered. The scenario starts again in about 2 minutes.",
+  expired: "Nobody approved a fix, so the scenario is starting again.",
 };
 
 export default function App() {
@@ -34,13 +36,23 @@ export default function App() {
   const [predicted, setPredicted] = useState<string[]>([]);
   const [runs, setRuns] = useState<ChaosRun[]>([]);
   const [scenarios, setScenarios] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [director, setDirector] = useState(true);
+  const [film, setFilm] = useState(false);
 
   const refreshIncidents = useCallback(async () => {
     const list = await api.incidents("all").catch(() => []);
     setIncidents(list);
-    // default to the biggest open incident (the storm), not whichever small one opened last
+    // follow the biggest open incident (the storm), not whichever small one opened last
     const open = list.filter((i) => i.status === "open").sort((a, b) => (b.members?.length ?? 0) - (a.members?.length ?? 0));
-    setSelected((cur) => cur ?? open[0]?.id ?? list[0]?.id ?? null);
+    setSelected((cur) => {
+      const still = list.find((i) => i.id === cur);
+      const justFixed = still?.status === "resolved" && Date.now() - (still.resolved_ts ?? 0) < 3 * 60_000;
+      // stay on an incident that was just fixed (its "Fixed." moment) unless a new multi-service incident starts
+      if (open[0] && (!still || (still.status !== "open" && (!justFixed || (open[0].members?.length ?? 0) > 1)))) return open[0].id;
+      const biggest = [...list.slice(0, 10)].sort((a, b) => (b.members?.length ?? 0) - (a.members?.length ?? 0))[0];
+      return cur ?? biggest?.id ?? null;
+    });
   }, []);
   const refreshIncident = useCallback(async () => {
     if (selected) setInc(await api.incident(selected).catch(() => null));
@@ -61,80 +73,106 @@ export default function App() {
       chaos_run: (r: ChaosRun) => setRuns((rs) => [r, ...rs]),
     });
   }, [refreshIncidents, refreshIncident]);
-
   useEffect(() => { refreshIncident(); }, [refreshIncident, incidents]);
 
-  const overlays: Overlays = {
-    path: tab === "Incident" ? inc?.evidence_path : undefined,
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT") return;
+      if (e.key === "f" || e.key === "F") setFilm((f) => !f);
+      if (e.key === "d" || e.key === "D") setDirector((d) => !d);
+      if (e.key === "Escape") { setFilm(false); setPicked(null); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const incidentOpen = inc?.status === "open";
+  const focus = useMemo(() => ({
+    root: incidentOpen ? inc?.root_target : null,
+    path: tab === "Incident" && incidentOpen ? inc?.evidence_path : undefined,
     cited,
     predicted: tab === "Predict" ? predicted : undefined,
-  };
-  const learning = status && status.learning_left_ms > 0;
-  const mm = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+  }), [incidentOpen, inc?.root_target, inc?.evidence_path, tab, cited, predicted]);
+
+  const recent = incidents.filter((i) => i.status === "open").concat(incidents.filter((i) => i.status !== "open").slice(0, 8));
+  const replay = status?.replay;
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center gap-4 border-b border-slate-800 px-4 py-2">
-        <h1 className="text-lg font-bold tracking-tight">RootCause</h1>
-        <span className={`rounded px-2 py-0.5 text-xs font-bold ${status?.mode === "replay" ? "bg-violet-700" : "bg-red-600"}`}>
-          {status?.mode === "replay" ? "REPLAY" : "LIVE"}
-        </span>
-        <span className="font-mono text-xs text-slate-400">graph {status?.graph ?? "-"} · tick {status?.tick ?? 0} · {clock(status?.tick_ts)}</span>
-        {status?.replay && <span className="text-xs text-violet-300">{status.replay.scenario}: {status.replay.phase}</span>}
-        {status?.replay && (
-          <span className="text-xs text-slate-300" title="Recorded from the real OpenTelemetry Demo; replayed through the same ingest and engine code.">
-            {REPLAY_HINT[status.replay.phase] ?? ""}
-          </span>
-        )}
-        {status?.mode === "replay" && scenarios.length > 0 && (
-          <select className="rounded border border-slate-700 bg-slate-950 p-1 text-xs" defaultValue=""
-                  onChange={(e) => e.target.value && api.startReplay(e.target.value)}>
-            <option value="">scenario…</option>
-            {scenarios.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        )}
-        {learning && <span className="text-xs text-amber-300">Learning baseline… {mm(status!.learning_left_ms)} left</span>}
-        {status?.last_error && <span className="truncate text-xs text-red-400" title={status.last_error}>⚠ {status.last_error}</span>}
-        <nav className="ml-auto flex gap-1">
-          {TABS.map((t) => (
-            <button key={t} onClick={() => setTab(t)}
-                    className={`rounded px-3 py-1 text-sm ${tab === t ? "bg-slate-700" : "hover:bg-slate-800"}`}>{t}</button>
-          ))}
-        </nav>
-      </header>
-
-      <div className="grid min-h-0 flex-1 grid-cols-12">
-        <section className={`${tab === "Incident" ? "col-span-7" : "col-span-12 h-[45vh]"} min-h-0 border-r border-slate-800`}>
-          {graph && graph.nodes.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-slate-400">
-              Waiting for traces… {learning ? `(learning baseline, ${mm(status!.learning_left_ms)} left)` : ""}
-            </div>
-          ) : <GraphView graph={graph} overlays={overlays} />}
-        </section>
-        {tab === "Incident" && (
-          <aside className="col-span-5 flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
-            <div className="flex flex-wrap gap-1">
-              {incidents.map((i) => (
-                <button key={i.id} onClick={() => setSelected(i.id)}
-                        className={`rounded px-2 py-0.5 font-mono text-xs ${selected === i.id ? "bg-slate-600" : "bg-slate-800"} ${i.status === "open" ? "text-red-300" : "text-slate-400"}`}>
-                  {i.id}
-                </button>
-              ))}
-              {incidents.length === 0 && <span className="text-sm text-slate-400">No incidents. All quiet.</span>}
-            </div>
-            {inc && <IncidentPanel inc={inc} onChanged={refreshIncident} />}
-            {inc && <div className="h-72 shrink-0"><TrailDrawer steps={inc.steps} onHover={setCited} /></div>}
-          </aside>
-        )}
-        {tab !== "Incident" && (
-          <section className="col-span-12 overflow-y-auto">
-            {tab === "Chaos lab" && <ChaosLab status={status} runs={runs} />}
-            {tab === "Predict" && <Predict graph={graph} onOverlay={setPredicted} />}
-            {tab === "Memory" && <Memory />}
-            {tab === "Reports" && <Reports />}
-          </section>
-        )}
+    <div className="relative h-full w-full overflow-hidden">
+      <div className="absolute inset-0">
+        <Stage graph={graph} focus={focus} director={director} incidentOpen={!!incidentOpen}
+               picked={picked} onPick={setPicked} frame={film ? 0 : tab === "Incident" ? 1 : -1} />
       </div>
+
+      {!film && (
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start gap-4 p-5">
+          <div className="pointer-events-auto flex items-center gap-3">
+            <h1 className="font-display text-[26px] font-extrabold tracking-[-0.03em]">RootCause</h1>
+            <span className="flex items-center gap-2 rounded-full border border-pine/15 bg-paper/90 px-3 py-1 text-sm">
+              <i className={`h-2 w-2 rounded-full ${status?.mode === "replay" ? "bg-plum" : "bg-eucalyptus"} motion-safe:animate-pulse`} />
+              {!status ? "Connecting…" : status.mode === "replay" ? `Replay of ${replay?.scenario ?? "a recorded fault"}` : "Live on the OpenTelemetry Demo"}
+            </span>
+            {status?.mode === "replay" && scenarios.length > 0 && (
+              <select className="field py-1 text-sm" defaultValue="" aria-label="Replay another recorded fault"
+                      onChange={(e) => e.target.value && api.startReplay(e.target.value)}>
+                <option value="">Replay another fault…</option>
+                {scenarios.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            )}
+          </div>
+          <nav className="pointer-events-auto ml-auto flex items-center gap-1 rounded-full border border-pine/10 bg-paper/90 p-1 backdrop-blur">
+            {TABS.map((t) => (
+              <button key={t} onClick={() => setTab(t)} aria-pressed={tab === t}
+                      className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${tab === t ? "bg-pine text-paper" : "hover:bg-pine/5"}`}>{t}</button>
+            ))}
+          </nav>
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-pine/10 bg-paper/90 p-1">
+            <button onClick={() => setDirector((d) => !d)} aria-pressed={director} title="Camera follows the incident (D)"
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${director ? "bg-saffron/25" : "hover:bg-pine/5"}`}>
+              Director {director ? "on" : "off"}
+            </button>
+            <button onClick={() => setFilm(true)} title="Hide the panels for recording (F)" className="rounded-full px-3.5 py-1.5 text-sm font-medium hover:bg-pine/5">
+              Film
+            </button>
+          </div>
+        </header>
+      )}
+
+      {replay && !film && (
+        <p className="pointer-events-none absolute left-5 top-[68px] z-30 text-sm text-pine-soft">{REPLAY_HINT[replay.phase] ?? ""}</p>
+      )}
+
+      <div className={`pointer-events-none absolute bottom-8 left-8 z-20 ${tab === "Incident" ? "max-w-[46vw]" : "hidden"}`}>
+        <TitleCard status={status} graph={graph} inc={inc} />
+      </div>
+
+      {!film && tab === "Incident" && (
+        <aside className={`sheet absolute right-5 top-[84px] z-30 w-[440px] max-w-[calc(100%-40px)] overflow-y-auto p-6 ${inc ? "bottom-5" : ""}`}>
+          {recent.length > 1 && (
+            <select className="field mb-4 w-full" value={selected ?? ""} onChange={(e) => setSelected(e.target.value)}
+                    aria-label="Choose an incident">
+              {recent.map((i) => <option key={i.id} value={i.id}>{i.id}, {i.status}{i.root_target ? `, ${i.root_target}` : ""}</option>)}
+            </select>
+          )}
+          {inc ? <IncidentPanel inc={inc} onChanged={refreshIncident} onCite={setCited} />
+               : <p className="text-[15px] muted">No incidents yet. When something breaks, the incident and its evidence appear here.</p>}
+        </aside>
+      )}
+
+      {!film && tab !== "Incident" && (
+        <section className="sheet absolute left-5 top-[84px] z-30 max-h-[calc(100%-104px)] w-[min(680px,calc(100%-40px))] overflow-y-auto p-6">
+          {tab === "Chaos lab" && <ChaosLab status={status} runs={runs} />}
+          {tab === "Predict" && <Predict graph={graph} onOverlay={setPredicted} />}
+          {tab === "Memory" && <Memory />}
+          {tab === "Reports" && <Reports />}
+        </section>
+      )}
+
+      {film && (
+        <button onClick={() => setFilm(false)} className="absolute right-5 top-5 z-30 rounded-full bg-paper/70 px-3 py-1 text-xs muted opacity-40 hover:opacity-100">
+          Exit film (Esc)
+        </button>
+      )}
     </div>
   );
 }

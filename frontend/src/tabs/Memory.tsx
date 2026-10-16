@@ -13,31 +13,34 @@ export default function Memory() {
     api.pager().then(setPages).catch(() => setPages([]));
   }, []);
   return (
-    <div className="grid grid-cols-3 gap-4 p-4">
-      <div className="card col-span-2">
-        <div className="label mb-2">Incident memory</div>
+    <div className="space-y-6">
+      <header>
+        <h2 className="font-display text-3xl font-bold tracking-tight">What RootCause remembers</h2>
+        <p className="mt-1 max-w-[60ch] muted">Every resolved incident keeps its signal fingerprint and the fix that worked,
+          so the next similar incident starts from the answer.</p>
+      </header>
+      {rows.length > 0 ? (
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-slate-400"><tr><th>incident</th><th>root</th><th>signals</th><th>fixed by</th><th>ttr</th><th>similar</th></tr></thead>
+          <thead className="text-left text-xs muted"><tr><th className="py-1">Incident</th><th>Cause</th><th>Signals</th><th>Fixed by</th><th>Took</th></tr></thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-t border-slate-800 align-top">
-                <td className="font-mono">{r.id}</td><td className="font-mono">{r.root}</td>
-                <td className="text-xs">{r.signals.join(", ")}</td><td className="text-xs">{r.fixes.join(", ") || "-"}</td>
-                <td>{r.ttr_ms ? `${Math.round(r.ttr_ms / 1000)} s` : "-"}</td><td className="font-mono text-xs">{r.similar.join(", ")}</td>
+              <tr key={r.id} className="border-t border-pine/10 align-top">
+                <td className="py-1.5 font-medium">{r.id}</td><td>{r.root}</td>
+                <td className="text-xs muted">{r.signals.join(", ")}</td><td className="text-xs">{r.fixes.join(", ") || "recovered on its own"}</td>
+                <td>{r.ttr_ms ? `${Math.round(r.ttr_ms / 1000)} s` : "–"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="text-sm text-slate-400">No resolved incidents yet.</p>}
-      </div>
-      <div className="card">
-        <div className="label mb-2">Pager inbox</div>
+      ) : <p className="text-sm muted">Nothing resolved yet.</p>}
+      <section>
+        <h3 className="section-title">Pages sent</h3>
         {pages.map((p, i) => (
-          <p key={i} className="mb-2 text-sm"><span className="font-mono">{p.team}</span> · {p.incident}
-            <span className="block text-xs text-slate-400">{clock(p.ts)} — {p.message}</span></p>
+          <p key={i} className="mb-2 text-sm"><b>{p.team}</b> about {p.incident}
+            <span className="block text-xs muted">{clock(p.ts)}: {p.message}</span></p>
         ))}
-        {pages.length === 0 && <p className="text-sm text-slate-400">No pages sent.</p>}
-      </div>
+        {pages.length === 0 && <p className="text-sm muted">No one has been paged.</p>}
+      </section>
     </div>
   );
 }

@@ -3,8 +3,33 @@
 @tailwind utilities;
 
 html, body, #root { height: 100%; }
-.card { @apply rounded-lg border border-slate-800 bg-slate-900/70 p-3; }
-.btn { @apply rounded px-3 py-1.5 text-sm font-medium disabled:opacity-40; }
-.btn-primary { @apply btn bg-emerald-600 hover:bg-emerald-500; }
-.btn-ghost { @apply btn border border-slate-700 hover:bg-slate-800; }
-.label { @apply text-xs uppercase tracking-wide text-slate-400; }
+body { @apply bg-porcelain font-sans text-pine antialiased; font-feature-settings: "tnum" 1; }
+
+/* one paper material for every panel that floats over the scene */
+.sheet {
+  @apply rounded-[20px] border border-pine/10 bg-paper/95 backdrop-blur;
+  box-shadow: 0 30px 70px -40px rgba(23, 49, 42, 0.45), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+.section-title { @apply mb-2 text-[13px] font-semibold text-pine; }
+.muted { @apply text-pine-soft; }
+.btn { @apply inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition disabled:opacity-35; }
+.btn-primary { @apply btn bg-pine text-paper hover:bg-pine/90; }
+.btn-ghost { @apply btn border border-pine/20 text-pine hover:bg-pine/5; }
+.field { @apply rounded-full border border-pine/20 bg-paper px-3 py-1.5 text-sm text-pine outline-none focus:border-pine; }
+:focus-visible { outline: 2px solid #17312A; outline-offset: 2px; }
+
+/* labels drawn by the 3D scene (drei <Html>) */
+.node-label {
+  @apply whitespace-nowrap rounded-full border border-pine/15 bg-paper/90 px-2.5 py-0.5 text-[13px] font-medium text-pine;
+  transition: opacity 0.4s;
+}
+.node-label.is-hot { @apply border-saffron bg-saffron/15; }
+.node-label.is-root { @apply border-raspberry bg-raspberry px-3.5 py-1 text-[17px] text-paper; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; }
+.node-label.is-dim { opacity: 0.45; }
+.node-card {
+  @apply flex flex-col gap-0.5 whitespace-nowrap rounded-xl border border-pine/15 bg-paper px-3 py-2 text-[13px] text-pine-soft;
+  box-shadow: 0 16px 40px -24px rgba(23, 49, 42, 0.5);
+}
+.node-card b { @apply text-[14px] text-pine; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

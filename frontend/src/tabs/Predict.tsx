@@ -1,4 +1,5 @@
-// Predict: what-if on a node (dashed overlay on the graph), then score precision/recall after the break.
+// Predict: "what if this breaks?" — the predicted blast radius is ringed in the 3D scene (plum); after the break,
+// score the prediction against what actually went anomalous.
 import { useState } from "react";
 import type { Graph } from "../api";
 import { api, pct } from "../api";
@@ -16,31 +17,34 @@ export default function Predict({ graph, onOverlay }: { graph: Graph | null; onO
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 p-4">
-      <div className="card space-y-3">
-        <div className="label">What if this breaks?</div>
-        <select className="w-full rounded border border-slate-700 bg-slate-950 p-1.5 text-sm" value={node}
-                onChange={(e) => setNode(e.target.value)}>
-          <option value="">pick a service…</option>
+    <div className="space-y-6">
+      <header>
+        <h2 className="font-display text-3xl font-bold tracking-tight">What if this breaks?</h2>
+        <p className="mt-1 max-w-[60ch] muted">RootCause walks the graph upstream from a service to predict who else fails.
+          Break it afterwards to check the prediction.</p>
+      </header>
+      <div className="flex items-center gap-2">
+        <select className="field" value={node} onChange={(e) => setNode(e.target.value)} aria-label="Service to break">
+          <option value="">Pick a service…</option>
           {services.map((s) => <option key={s}>{s}</option>)}
         </select>
         <button className="btn-primary" disabled={!node} onClick={predict}>Predict</button>
-        {pred && (
-          <div className="text-sm">
-            <p><b>{pred.services.length}</b> services fail: <span className="font-mono">{pred.services.join(", ")}</span></p>
-            <p><b>{pred.queues.length}</b> queues lag: <span className="font-mono">{pred.queues.join(", ") || "-"}</span></p>
-            <p><b>{pred.journeys.length}</b> journeys break: {pred.journeys.map((j) => j.replace("journey:", "")).join(", ") || "-"}</p>
-            <p className="mt-2 text-xs text-slate-400">Now break it in the Chaos lab, wait for alerts, then score the prediction.</p>
-            <button className="btn-ghost mt-2" onClick={async () => setScore(await api.scorePrediction(pred.id))}>Score vs reality</button>
-          </div>
-        )}
       </div>
+      {pred && (
+        <section className="space-y-2 text-[15px]">
+          <p><b className="font-display text-2xl text-plum">{pred.services.length}</b> services would fail: {pred.services.join(", ")}.</p>
+          <p><b className="font-display text-2xl text-plum">{pred.queues.length}</b> queues would lag{pred.queues.length ? `: ${pred.queues.join(", ")}` : ""}.</p>
+          <p><b className="font-display text-2xl text-plum">{pred.journeys.length}</b> journeys would break{pred.journeys.length ? `: ${pred.journeys.map((j) => j.replace("journey:", "")).join(", ")}` : ""}.</p>
+          <p className="text-sm muted">They are ringed in plum on the graph. Break the service in the Chaos lab, wait for the alerts, then score.</p>
+          <button className="btn-ghost" onClick={async () => setScore(await api.scorePrediction(pred.id))}>Score against what happened</button>
+        </section>
+      )}
       {score && (
-        <div className="card">
-          <div className="label mb-2">Prediction vs :Anomalous</div>
-          <p className="text-3xl font-bold">precision {pct(score.precision)} · recall {pct(score.recall)}</p>
-          <p className="mt-2 text-sm">actually anomalous: <span className="font-mono">{score.actual.join(", ") || "-"}</span></p>
-        </div>
+        <section>
+          <h3 className="section-title">Prediction against reality</h3>
+          <p className="font-display text-4xl font-bold">{pct(score.precision)} precise, {pct(score.recall)} complete</p>
+          <p className="mt-1 text-sm muted">Actually alerting: {score.actual.join(", ") || "nothing yet"}.</p>
+        </section>
       )}
     </div>
   );

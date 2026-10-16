@@ -1,23 +1,23 @@
-// Agent trail: the incident's (:Step) chain. Hovering a step highlights the nodes it cited on the graph.
+// The agent's investigation, in order (each (:Step) in the graph). Hovering a step rings the nodes it cited
+// in the 3D scene.
 import type { Step } from "../api";
 import { clock } from "../api";
 
 export default function TrailDrawer({ steps, onHover }: { steps: Step[]; onHover: (ids: string[]) => void }) {
+  if (steps.length === 0) return <p className="text-sm muted">No steps yet.</p>;
   return (
-    <div className="card h-full overflow-y-auto">
-      <div className="label mb-2">Agent trail</div>
-      {steps.length === 0 && <p className="text-sm text-slate-400">no steps yet</p>}
-      <ol className="space-y-1.5">
-        {steps.map((s) => (
-          <li key={s.id} className="cursor-default rounded px-2 py-1 hover:bg-slate-800"
-              onMouseEnter={() => onHover(s.cited)} onMouseLeave={() => onHover([])}>
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>{s.n}. <span className="font-mono text-sky-300">{s.tool}</span></span><span>{clock(s.ts)}</span>
-            </div>
-            <div className="text-sm">{s.summary}</div>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <ol className="relative space-y-0.5 border-l border-pine/15 pl-4">
+      {steps.map((s) => (
+        <li key={s.id} className="relative cursor-default rounded-lg px-2 py-1.5 hover:bg-pine/5"
+            onMouseEnter={() => onHover(s.cited)} onMouseLeave={() => onHover([])}
+            onFocus={() => onHover(s.cited)} onBlur={() => onHover([])} tabIndex={0}>
+          <span className="absolute -left-[21px] top-3 h-2 w-2 rounded-full bg-pine" aria-hidden />
+          <div className="flex justify-between text-xs muted">
+            <span className="font-semibold text-pine">{s.tool.replace(/_/g, " ")}</span><span>{clock(s.ts)}</span>
+          </div>
+          <div className="text-sm">{s.summary}</div>
+        </li>
+      ))}
+    </ol>
   );
 }

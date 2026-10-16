@@ -1,101 +1,130 @@
-// Incident panel: "N alerts, 1 incident", ranked hypotheses (stacked bars of the five weighted signals),
-// what changed, journey impact, similar incidents, the agent verdict and the action cards.
+// The incident dossier: one continuous sheet, read top to bottom like an on-call engineer would —
+// verdict and evidence chain, ranked causes (the five weighted graph signals), what changed, who is hurt,
+// have we seen this before, what to do (action cards), and the agent's investigation steps.
 import type { Hypothesis, Incident } from "../api";
 import { clock, pct } from "../api";
 import ActionCard from "./ActionCard";
+import TrailDrawer from "./TrailDrawer";
 
 const WEIGHTS: Record<string, number> = { depth: 0.3, self: 0.25, pagerank: 0.2, change: 0.15, memory: 0.1 };
-const COLOURS: Record<string, string> = {
-  depth: "bg-sky-500", self: "bg-rose-500", pagerank: "bg-violet-500", change: "bg-amber-400", memory: "bg-emerald-500",
+const SIGNAL: Record<string, { colour: string; name: string }> = {
+  depth: { colour: "bg-pine", name: "nothing left to blame" },
+  self: { colour: "bg-raspberry", name: "fails on its own" },
+  pagerank: { colour: "bg-plum", name: "blame flows to it" },
+  change: { colour: "bg-saffron", name: "changed just before" },
+  memory: { colour: "bg-eucalyptus", name: "seen before" },
 };
 
-function HypBar({ h }: { h: Hypothesis }) {
+function Cause({ h, top }: { h: Hypothesis; top: boolean }) {
   return (
-    <div className="mb-2">
-      <div className="flex justify-between text-sm">
-        <span className="font-mono">{h.rank}. {h.target}</span>
-        <span className="font-mono text-slate-300">{h.score.toFixed(2)}</span>
+    <li className="py-1.5">
+      <div className="flex items-baseline justify-between">
+        <span className={top ? "font-display text-xl font-bold text-raspberry" : "text-[15px] font-medium"}>
+          {h.target.replace(/^edge:/, "")}
+          {h.target.startsWith("edge:") && <span className="ml-1 text-xs font-normal text-pine-soft">(the connection)</span>}
+        </span>
+        <span className={top ? "font-display text-xl font-bold" : "text-sm text-pine-soft"}>{h.score.toFixed(2)}</span>
       </div>
-      <div className="mt-1 flex h-2.5 w-full overflow-hidden rounded bg-slate-800">
+      <div className="mt-1 flex h-2 w-full overflow-hidden rounded-full bg-mist/60">
         {Object.keys(WEIGHTS).map((s) => (
-          <div key={s} title={`${s} ${(h[s as keyof Hypothesis] as number).toFixed(2)}`}
-               className={COLOURS[s]} style={{ width: `${(h[s as keyof Hypothesis] as number) * WEIGHTS[s] * 100}%` }} />
+          <div key={s} title={`${SIGNAL[s].name}: ${(h[s as keyof Hypothesis] as number).toFixed(2)}`}
+               className={SIGNAL[s].colour} style={{ width: `${(h[s as keyof Hypothesis] as number) * WEIGHTS[s] * 100}%` }} />
         ))}
       </div>
-    </div>
+    </li>
   );
 }
 
-export default function IncidentPanel({ inc, onChanged }: { inc: Incident; onChanged: () => void }) {
-  const open = inc.alerts.filter((a) => a.status === "firing").length;
+export default function IncidentPanel({ inc, onChanged, onCite }: { inc: Incident; onChanged: () => void; onCite: (ids: string[]) => void }) {
+  const firing = inc.alerts.filter((a) => a.status === "firing").length;
+  const open = inc.status === "open";
+  const actions = inc.actions.filter((a) => a.status !== "rejected");
   return (
-    <div className="space-y-3">
-      <div className="card">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold">{inc.id}</h2>
-          <span className={`rounded px-2 py-0.5 text-xs ${inc.status === "open" ? "bg-red-600" : "bg-emerald-700"}`}>
-            {inc.status}{inc.agent_state ? ` · ${inc.agent_state}` : ""}
+    <div className="space-y-6">
+      <header>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-2xl font-bold tracking-tight">{inc.id}</h2>
+          <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${open ? "bg-raspberry/10 text-raspberry" : "bg-eucalyptus/15 text-pine"}`}>
+            {open ? (inc.agent_state === "awaiting_approval" ? "waiting for your approval" : inc.agent_state ?? "open") : "resolved"}
           </span>
         </div>
-        <p className="mt-1 text-2xl font-bold">
-          {inc.alerts.length} alerts <span className="text-slate-400">→</span> 1 incident
+        <p className="mt-1 text-sm muted">
+          Opened {clock(inc.created_ts)}. {firing} of {inc.alerts.length} alerts still firing.
+          {inc.ttr_ms ? ` Resolved in ${Math.round(inc.ttr_ms / 1000)} s.` : ""}
         </p>
-        <p className="text-xs text-slate-400">{open} firing · opened {clock(inc.created_ts)}
-          {inc.ttr_ms ? ` · resolved in ${Math.round(inc.ttr_ms / 1000)} s` : ""}</p>
-        {inc.verdict?.narrative && <p className="mt-2 text-sm text-slate-200">{inc.verdict.narrative}</p>}
-        {inc.evidence_path?.length > 0 && (
-          <p className="mt-2 font-mono text-xs text-yellow-300">{inc.evidence_path.join(" → ")}</p>
-        )}
-      </div>
+        {inc.verdict?.narrative && <p className="mt-3 text-[15px] leading-relaxed">{inc.verdict.narrative}</p>}
+      </header>
 
-      <div className="card">
-        <div className="label mb-2">Ranked root causes</div>
-        {inc.hypotheses.slice(0, 5).map((h) => <HypBar key={h.target} h={h} />)}
-        {inc.hypotheses.length === 0 && <p className="text-sm text-slate-400">ranking…</p>}
-        <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-400">
+      {inc.evidence_path?.length > 0 && (
+        <section>
+          <h3 className="section-title">Evidence path</h3>
+          <ol className="flex flex-wrap items-center gap-1.5 text-sm">
+            {inc.evidence_path.map((n, i) => (
+              <li key={n} className="flex items-center gap-1.5">
+                <span className={`rounded-full px-2.5 py-0.5 ${i === inc.evidence_path.length - 1 ? "bg-raspberry font-semibold text-paper" : "bg-saffron/15"}`}>{n}</span>
+                {i < inc.evidence_path.length - 1 && <span aria-hidden className="text-pine-soft">⟶</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      <section>
+        <h3 className="section-title">Ranked causes</h3>
+        <ol>{inc.hypotheses.slice(0, 4).map((h, i) => <Cause key={h.target} h={h} top={i === 0} />)}</ol>
+        {inc.hypotheses.length === 0 && <p className="text-sm muted">Ranking…</p>}
+        <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs muted">
           {Object.keys(WEIGHTS).map((s) => (
-            <span key={s} className="flex items-center gap-1"><i className={`inline-block h-2 w-2 ${COLOURS[s]}`} />{s}</span>
+            <li key={s} className="flex items-center gap-1.5"><i className={`inline-block h-2 w-2 rounded-full ${SIGNAL[s].colour}`} />{SIGNAL[s].name}</li>
           ))}
-        </div>
-      </div>
+        </ul>
+      </section>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="card">
-          <div className="label mb-1">What changed</div>
-          {inc.changes.length === 0 && <p className="text-sm text-slate-400">nothing near onset</p>}
+      <section className="grid grid-cols-2 gap-5">
+        <div>
+          <h3 className="section-title">What changed</h3>
+          {inc.changes.length === 0 && <p className="text-sm muted">Nothing near the onset.</p>}
           {inc.changes.map((c) => (
-            <p key={c.id} className="text-sm"><span className="font-mono">{c.target}</span> {c.from_variant ?? ""} → {c.to ?? c.kind}
-              <span className="block text-xs text-slate-400">{clock(c.ts)} · {c.actor}</span></p>
+            <p key={c.id} className="text-sm"><b>{c.target}</b> {c.from_variant ?? ""} → {c.to ?? c.kind}
+              <span className="block text-xs muted">{clock(c.ts)}, by {c.actor}</span></p>
           ))}
         </div>
-        <div className="card">
-          <div className="label mb-1">Journey impact</div>
-          {inc.impact.length === 0 && <p className="text-sm text-slate-400">none measured</p>}
+        <div>
+          <h3 className="section-title">Who is hurt</h3>
+          {inc.impact.length === 0 && <p className="text-sm muted">No journey has dropped.</p>}
           {inc.impact.map((i) => (
-            <div key={i.journey} className="mb-1 text-sm">
-              <div className="flex justify-between"><span>{i.journey.replace("journey:", "")}</span><span>-{pct(i.pct)}</span></div>
-              <div className="h-1.5 rounded bg-slate-800"><div className="h-1.5 rounded bg-red-500" style={{ width: pct(i.pct) }} /></div>
+            <div key={i.journey} className="mb-1.5 text-sm">
+              <div className="flex justify-between"><span>{i.journey.replace("journey:", "")} journey</span><b className="text-raspberry">−{pct(i.pct)}</b></div>
+              <div className="mt-0.5 h-1.5 rounded-full bg-mist/60"><div className="h-1.5 rounded-full bg-raspberry" style={{ width: pct(i.pct) }} /></div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
       {inc.similar?.length > 0 && (
-        <div className="card">
-          <div className="label mb-1">Similar past incidents</div>
-          {inc.similar.map((s) => (
-            <p key={s.incident} className="text-sm"><span className="font-mono">{s.incident}</span> {s.score.toFixed(2)}
-              {s.score >= 0.6 && <span className="ml-1 rounded bg-emerald-800 px-1 text-xs">strong match</span>}
-              <span className="block text-xs text-slate-400">fixed by {s.fixes.join(", ") || "-"}</span></p>
+        <section>
+          <h3 className="section-title">Seen before</h3>
+          {inc.similar.slice(0, 3).map((s) => (
+            <p key={s.incident} className="text-sm">
+              <b>{s.incident}</b>, {Math.round(s.score * 100)} % similar{s.score >= 0.6 ? ", a strong match" : ""}
+              {s.fixes.length > 0 && <span className="block text-xs muted">fixed by {s.fixes.join(", ")}</span>}
+            </p>
           ))}
-        </div>
+        </section>
       )}
 
-      <div className="space-y-2">
-        <div className="label">Proposed actions</div>
-        {inc.actions.filter((a) => a.status !== "rejected").map((a) => <ActionCard key={a.id} a={a} onChanged={onChanged} />)}
-        {inc.actions.length === 0 && <p className="text-sm text-slate-400">waiting for the agent…</p>}
-      </div>
+      <section>
+        <h3 className="section-title">What to do</h3>
+        <div className="space-y-2">
+          {actions.map((a) => <ActionCard key={a.id} a={a} onChanged={onChanged} closed={!open} />)}
+        </div>
+        {actions.length === 0 && <p className="text-sm muted">The agent is still investigating.</p>}
+      </section>
+
+      <section>
+        <h3 className="section-title">How the agent got there</h3>
+        <TrailDrawer steps={inc.steps} onHover={onCite} />
+      </section>
     </div>
   );
 }
