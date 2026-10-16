@@ -6,6 +6,7 @@
 //   particles is the edge's error rate;
 // - alerting (:Anomalous) nodes turn saffron and send out a shockwave; dashed raspberry arcs are BLAMES edges;
 // - the root cause gets a raspberry beacon, and a light pulse runs down the evidence path towards it;
+// - rings: plum = predicted to fail, pine = cited by an agent step, lake blue (wide) = blast radius of the root;
 // - "Director" moves the camera with the incident (overview -> the root cause -> back to overview when it heals).
 import { ContactShadows, Grid, Html, Line, OrbitControls, RoundedBox } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -15,7 +16,7 @@ import type { Graph, GraphEdge, GraphNode } from "../api";
 import { arc, layout, topologyKey, type P3 } from "./layout";
 import { C } from "./palette";
 
-export type Focus = { root?: string | null; path?: string[]; cited?: string[]; predicted?: string[] };
+export type Focus = { root?: string | null; path?: string[]; cited?: string[]; predicted?: string[]; blast?: string[] };
 type Props = {
   graph: Graph | null; focus: Focus; director: boolean; incidentOpen: boolean;
   picked: string | null; onPick: (id: string | null) => void;
@@ -85,7 +86,8 @@ function Scene({ graph, focus, director, incidentOpen, picked, onPick, frame = 1
         <Node key={n.id} n={n} p={pos[n.id]} start={start} delay={(tierOf(pos[n.id]) - minX) / 4.4 * 0.16}
               isRoot={root === n.id} onPath={!!focus.path?.includes(n.id)}
               cited={!!focus.cited?.includes(n.id)} predicted={!!focus.predicted?.includes(n.id)}
-              dim={incidentOpen && !n.labels.includes("Anomalous") && !focus.path?.includes(n.id)}
+              blast={!!focus.blast?.includes(n.id)}
+              dim={incidentOpen && !n.labels.includes("Anomalous") && !focus.path?.includes(n.id) && !focus.blast?.includes(n.id)}
               hovered={hover === n.id} picked={picked === n.id}
               onHover={setHover} onPick={onPick} />
       ))}
@@ -124,11 +126,11 @@ function Ground() {
 // ---------------------------------------------------------------------------------------------- nodes
 type NodeProps = {
   n: GraphNode; p: P3; start: React.MutableRefObject<number>; delay: number; isRoot: boolean; onPath: boolean;
-  cited: boolean; predicted: boolean; dim: boolean; hovered: boolean; picked: boolean;
+  cited: boolean; predicted: boolean; blast: boolean; dim: boolean; hovered: boolean; picked: boolean;
   onHover: (id: string | null) => void; onPick: (id: string) => void;
 };
 
-function Node({ n, p, start, delay, isRoot, onPath, cited, predicted, dim, hovered, picked, onHover, onPick }: NodeProps) {
+function Node({ n, p, start, delay, isRoot, onPath, cited, predicted, blast, dim, hovered, picked, onHover, onPick }: NodeProps) {
   const group = useRef<THREE.Group>(null); // position (effects hang off this, unscaled)
   const body = useRef<THREE.Group>(null);  // scale (the node itself)
   const mat = useRef<THREE.MeshPhysicalMaterial>(null);
@@ -170,6 +172,7 @@ function Node({ n, p, start, delay, isRoot, onPath, cited, predicted, dim, hover
       {anomalous && !reduced && <Shockwave colour={isRoot ? C.raspberry : C.saffron} height={p[1]} />}
       {isRoot && <Beacon height={p[1]} />}
       {(cited || predicted || onPath) && <Halo colour={predicted ? C.plum : cited ? C.pine : C.saffron} size={size} />}
+      {blast && <Halo colour={C.lake} size={size + 0.22} />}
       {(!dim || hovered || picked || cited) && (
         <Html position={[0, size + 0.45, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
           <div className={`node-label ${isRoot ? "is-root" : anomalous ? "is-hot" : ""}`}>

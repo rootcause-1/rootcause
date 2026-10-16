@@ -11,6 +11,7 @@ export const C = {
   saffron: "#F0A830",
   raspberry: "#D6265C",
   plum: "#7B4B94",      // predictions (what-if)
+  lake: "#2F7FA8",      // blast radius (who depends on the root cause)
 } as const;
 
 /** Edge colour by error rate: healthy -> symptom -> failing. */

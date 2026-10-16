@@ -1,18 +1,10 @@
 // Reports: post-incident reports stored as (:Report) nodes. The markdown is rendered with a tiny renderer that only
-// knows what actions/report.py writes (headings, bullet lists, tables, **bold**, `code`); no HTML is ever injected.
-import { Fragment, ReactNode, useEffect, useState } from "react";
+// knows what actions/report.py writes (headings, bullet lists, tables, plus components/Inline); no HTML is injected.
+import { ReactNode, useEffect, useState } from "react";
 import { api, clock } from "../api";
+import { inline } from "../components/Inline";
 
 type Rep = Awaited<ReturnType<typeof api.reports>>[number];
-
-function inline(text: string): ReactNode[] {
-  // split on **bold** and `code`; everything else is plain text
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean).map((part, i) => {
-    if (part.startsWith("**")) return <strong key={i} className="text-pine">{part.slice(2, -2)}</strong>;
-    if (part.startsWith("`")) return <code key={i} className="rounded-md bg-saffron/15 px-1.5 font-medium text-pine">{part.slice(1, -1)}</code>;
-    return <Fragment key={i}>{part}</Fragment>;
-  });
-}
 
 function Markdown({ md }: { md: string }) {
   const out: ReactNode[] = [];
@@ -48,8 +40,16 @@ export default function Reports() {
   const [rows, setRows] = useState<Rep[] | null>(null);
   const [sel, setSel] = useState<Rep | null>(null);
   useEffect(() => { api.reports().then((r) => { setRows(r); setSel(r[0] ?? null); }).catch(() => setRows([])); }, []);
+  if (rows !== null && rows.length === 0) {
+    return (
+      <div>
+        <h3 className="section-title">Reports</h3>
+        <p className="text-sm muted">No reports yet. One is written when an incident is fixed.</p>
+      </div>
+    );
+  }
   return (
-    <div className="grid grid-cols-[180px_1fr] gap-6">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-[180px_1fr]">
       <div>
         <h3 className="section-title">Reports</h3>
         {rows === null && <p className="text-sm muted">Loading…</p>}
@@ -59,7 +59,6 @@ export default function Reports() {
             {r.incident}<span className="block text-xs font-normal muted">{clock(r.ts)}</span>
           </button>
         ))}
-        {rows?.length === 0 && <p className="text-sm muted">No reports yet. One is written when an incident is fixed.</p>}
       </div>
       <div className="min-w-0">{sel ? <Markdown md={sel.markdown} /> : null}</div>
     </div>

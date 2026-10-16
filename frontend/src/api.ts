@@ -54,6 +54,8 @@ export const api = {
   approve: (id: string, confirm?: string) =>
     j(`/api/actions/${id}/approve`, { method: "POST", body: JSON.stringify({ confirm, execute: true }) }),
   reject: (id: string) => j(`/api/actions/${id}/reject`, { method: "POST" }),
+  blast: (node_id: string) =>
+    j<{ node: string; upstream: string[]; journeys: string[] }>(`/api/blast/${encodeURIComponent(node_id)}`),
   predict: (node_id: string) =>
     j<{ id: string; services: string[]; queues: string[]; journeys: string[] }>("/api/predict", {
       method: "POST", body: JSON.stringify({ node_id }),

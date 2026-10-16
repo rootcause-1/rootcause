@@ -33,3 +33,7 @@ body { @apply bg-porcelain font-sans text-pine antialiased; font-feature-setting
 .node-card b { @apply text-[14px] text-pine; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* horizontal tab strip on phones: scrollable, no scrollbar */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

@@ -1,9 +1,11 @@
 // The incident dossier: one continuous sheet, read top to bottom like an on-call engineer would —
 // verdict and evidence chain, ranked causes (the five weighted graph signals), what changed, who is hurt,
 // have we seen this before, what to do (action cards), and the agent's investigation steps.
+import { useEffect, useState } from "react";
 import type { Hypothesis, Incident } from "../api";
-import { clock, pct } from "../api";
+import { api, clock, pct } from "../api";
 import ActionCard from "./ActionCard";
+import { inline } from "./Inline";
 import TrailDrawer from "./TrailDrawer";
 
 const WEIGHTS: Record<string, number> = { depth: 0.3, self: 0.25, pagerank: 0.2, change: 0.15, memory: 0.1 };
@@ -35,10 +37,37 @@ function Cause({ h, top }: { h: Hypothesis; top: boolean }) {
   );
 }
 
-export default function IncidentPanel({ inc, onChanged, onCite }: { inc: Incident; onChanged: () => void; onCite: (ids: string[]) => void }) {
+type Change = Incident["changes"][number];
+
+/** Identical changes in a row (a container that keeps dying) become one line with a count and the latest time. */
+export function groupChanges(changes: Change[]): (Change & { count: number })[] {
+  const out: (Change & { count: number })[] = [];
+  for (const c of changes) {
+    const same = out.find((o) => o.target === c.target && o.kind === c.kind && o.from_variant === c.from_variant && o.to === c.to);
+    if (same) { same.count += 1; if (c.ts > same.ts) same.ts = c.ts; } else out.push({ ...c, count: 1 });
+  }
+  return out;
+}
+
+type Blast = { upstream: string[]; journeys: string[] } | null;
+
+export default function IncidentPanel({ inc, onChanged, onCite, onBlast }: {
+  inc: Incident; onChanged: () => void; onCite: (ids: string[]) => void; onBlast: (ids: string[]) => void;
+}) {
   const firing = inc.alerts.filter((a) => a.status === "firing").length;
   const open = inc.status === "open";
   const actions = inc.actions.filter((a) => a.status !== "rejected");
+  const root = inc.root_target ? inc.root_target.replace(/^edge:.*->/, "") : null;
+  const [blast, setBlast] = useState<Blast>(null);
+  useEffect(() => { setBlast(null); onBlast([]); }, [inc.id, root]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function toggleBlast() {
+    if (blast || !root) { setBlast(null); onBlast([]); return; }
+    const b = await api.blast(root).catch(() => null);
+    if (!b) return;
+    const ids = b.upstream.filter((id) => id !== root);
+    setBlast({ upstream: ids, journeys: b.journeys });
+    onBlast(ids);
+  }
   return (
     <div className="space-y-6">
       <header>
@@ -52,7 +81,7 @@ export default function IncidentPanel({ inc, onChanged, onCite }: { inc: Inciden
           Opened {clock(inc.created_ts)}. {firing} of {inc.alerts.length} alerts still firing.
           {inc.ttr_ms ? ` Resolved in ${Math.round(inc.ttr_ms / 1000)} s.` : ""}
         </p>
-        {inc.verdict?.narrative && <p className="mt-3 text-[15px] leading-relaxed">{inc.verdict.narrative}</p>}
+        {inc.verdict?.narrative && <p className="mt-3 text-[15px] leading-relaxed">{inline(inc.verdict.narrative)}</p>}
       </header>
 
       {inc.evidence_path?.length > 0 && (
@@ -66,6 +95,19 @@ export default function IncidentPanel({ inc, onChanged, onCite }: { inc: Inciden
               </li>
             ))}
           </ol>
+          {root && !root.includes(":") && (
+            <div className="mt-2 text-sm">
+              <button className="btn-ghost py-1 text-xs" onClick={toggleBlast} aria-pressed={!!blast}>
+                <i className="inline-block h-2 w-2 rounded-full bg-lake" />{blast ? "Hide blast radius" : "Show blast radius"}
+              </button>
+              {blast && (
+                <p className="mt-1.5 muted">
+                  {blast.upstream.length === 0 ? `Nothing calls ${root}.` : `${blast.upstream.length} services depend on ${root}: ${blast.upstream.join(", ")}.`}
+                  {blast.journeys.length > 0 && ` Journeys: ${blast.journeys.map((j) => j.replace("journey:", "")).join(", ")}.`}
+                </p>
+              )}
+            </div>
+          )}
         </section>
       )}
 
@@ -80,13 +122,14 @@ export default function IncidentPanel({ inc, onChanged, onCite }: { inc: Inciden
         </ul>
       </section>
 
-      <section className="grid grid-cols-2 gap-5">
+      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div>
           <h3 className="section-title">What changed</h3>
           {inc.changes.length === 0 && <p className="text-sm muted">Nothing near the onset.</p>}
-          {inc.changes.map((c) => (
-            <p key={c.id} className="text-sm"><b>{c.target}</b> {c.from_variant ?? ""} → {c.to ?? c.kind}
-              <span className="block text-xs muted">{clock(c.ts)}, by {c.actor}</span></p>
+          {groupChanges(inc.changes).map((c) => (
+            <p key={c.id} className="mb-1 text-sm"><b>{c.target}</b> {c.from_variant ?? ""} → {c.to ?? c.kind}
+              {c.count > 1 && <span className="ml-1 rounded-full bg-mist/70 px-1.5 text-xs">×{c.count}</span>}
+              <span className="block text-xs muted">{c.count > 1 ? "last at " : ""}{clock(c.ts)}, by {c.actor}</span></p>
           ))}
         </div>
         <div>

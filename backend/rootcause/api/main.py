@@ -222,6 +222,12 @@ class PredictReq(BaseModel):
     node_id: str
 
 
+@app.get("/api/blast/{node_id}")
+async def blast_route(node_id: str) -> dict[str, Any]:
+    """Blast radius of a node: everything upstream of it (upstream_bfs) and the journeys that need it."""
+    return await S.rt.tools.blast_radius(node_id)
+
+
 @app.post("/api/predict")
 async def predict_route(body: PredictReq) -> dict[str, Any]:
     return await predict.predict(S.rt.db, body.node_id)
