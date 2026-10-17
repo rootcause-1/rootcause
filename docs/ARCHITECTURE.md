@@ -45,7 +45,7 @@ histories for slopes, SSE queues, and the replay player's cursor.
    statefulness), and paging the owner last.
 2. Approve mints a single-use token (stored hashed on the Action, 10 min TTL); execute checks it.
 3. Flag reverts are atomic file replaces; restarts go through the Docker SDK; both show up as `Change(actor=rootcause)`.
-4. Verification waits up to 90 s for every incident alert to resolve, then resolves the incident, links memory and
+4. Verification waits up to 150 s (`verify.timeout_seconds`) for every incident alert to resolve, then resolves the incident, links memory and
    writes the report; a failure re-proposes without the failed action.
 5. In replay mode actions are simulated and the player jumps to the recording's recovery segment if the fix matches.
 

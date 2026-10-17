@@ -427,7 +427,7 @@ Actions:
 - `flagd.set_variant(flag, variant)`: read JSON, change `defaultVariant`, write to temp file + `os.replace` (atomic). Record `(:Action)` and the resulting `(:Change {actor:'rootcause'})`.
 - `containers.restart(service)`: Docker SDK restart of the mapped container.
 - `pager.page(team, incident)`: append to `data/pager_inbox.jsonl` (shown in UI) and POST to `PAGER_WEBHOOK_URL` if set.
-- `verify.watch(incident)`: success when every alert in the incident is resolved for 3 ticks within 90 s → `Action.status='verified'`, `Incident.status='resolved'`, `ttr_ms` set; otherwise `failed` and the agent proposes the next action.
+- `verify.watch(incident)`: success when every alert in the incident is resolved for 3 ticks within `verify.timeout_seconds` (150 s; 90 s was too tight: the 60 s error window has to drain first) → `Action.status='verified'`, `Incident.status='resolved'`, `ttr_ms` set; otherwise `failed` and the agent proposes the next action.
 - `report.write(incident)`: gather facts with queries (timeline, path, change, impact, action, similar incidents), LLM narrates if enabled, else a template. Save `(:Report)` + `reports/INC-xxxx.md`.
 
 Chaos runner (`chaos/runner.py`), one run:

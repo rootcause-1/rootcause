@@ -104,7 +104,7 @@ agent:
   budget_seconds: 90
 
 verify:
-  timeout_seconds: 90
+  timeout_seconds: 150                       # alarms clear only after the 60 s error window drains + 3 healthy ticks; recorded runs took 70-95 s
 
 replay:
   loop_pause_seconds: 120                    # after an approved fix: time to look at recovery + report, then restart
