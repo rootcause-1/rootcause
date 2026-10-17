@@ -22,3 +22,18 @@ When you are done, reply with only a JSON object, no prose around it:
 NARRATOR = """You write the summary section of a post-incident report for an on-call team.
 Use only the facts given. Three to five sentences: what broke, why (root cause and the change), who was affected,
 what fixed it and how long it took. Name graph node ids in backticks."""
+
+FIXER = """You write a small, reviewable code fix for an incident that RootCause already diagnosed.
+You get the incident facts (root cause, the change that triggered it, alerts, customer impact) and the source files
+where the root-cause service reads the feature flag that changed. The flag was switched on and made this code fail.
+
+Write the smallest safe change that stops this failure from hurting customers again, for example a guard that keeps
+the normal path working, a safe default, or a clear error instead of a crash. Keep the code style of the file.
+Do not change unrelated code, do not add dependencies, do not touch other files.
+
+Reply with only a JSON object, no prose around it:
+{"title": "<pull request title, under 70 characters>",
+ "explanation": "<2-4 sentences for the reviewer: what was wrong and what the change does>",
+ "edits": [{"file": "<path exactly as given>", "find": "<exact text copied from the file, unique in it>",
+            "replace": "<new text>"}]}
+Each `find` must match the file exactly once (copy whole lines, keep indentation). Use at most 4 edits."""

@@ -83,6 +83,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 | Chat narrator | WhatsApp-style chat driven by real incident state; "Yes, fix it"; demo autoplay in replay only. | live |
 | Tabs | Break something, Predict, Memory, Reports, **Your company**. | live (company: new) |
 | Connect your GitHub | Codebase tab: shallow clone + read of a public repo → CodeModule/IMPLEMENTS/DECLARES/READ_IN/TOUCHED in the graph; chat shows the code behind the root cause (file:line link); agent `read_code` step; code-vs-traffic drift. | new, unit + graph tests, checked end to end on the real API |
+| Fix it in code | After recovery the chat offers a pull request: Claude writes a find/replace fix for the file where the root reads the changed flag; RootCause opens it on our fork with the graph evidence; `(:PullRequest)-[:FIXES]->(:Incident)`. | new, tested with fakes; needs keys for the real thing |
 | Your company | Teams, on-call, ownership, journeys, runbooks + automation URLs, edited in the graph (ingestion reads journey routes from the graph); export seed.yaml. | new |
 
 ## 3. Is FalkorDB used properly? Yes. The details:
@@ -91,7 +92,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 reasons over it there: the alerting subgraph (`:Anomalous`), blame edges, incidents, hypotheses, actions, the agent's
 steps, memory and chaos runs. Turn FalkorDB off and nothing can group, rank, explain or remember.
 
-**Graph algorithms doing real work** (all in named `.cypher` files, 100 queries in docs/QUERIES.md):
+**Graph algorithms doing real work** (all in named `.cypher` files, 102 queries in docs/QUERIES.md):
 | Question | Algorithm | Query |
 | --- | --- | --- |
 | Which alarms belong together? | `algo.WCC` | group_incidents |

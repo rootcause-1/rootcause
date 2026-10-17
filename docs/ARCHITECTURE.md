@@ -84,6 +84,16 @@ histories for slopes, SSE queues, and the replay player's cursor.
 4. `code_drift` lists calls seen live that the repo never declares, and declared dependencies never called.
 5. Explanation only: nothing from the code reaches the ranking, so the diagnosis can't be tuned to the answer.
 
+### Fix it in code (17 Oct)
+1. When a scanned repo locates the root's code and Claude + GitHub are configured, propose adds a `code_fix` action
+   (risk low: nothing runs until a person merges). The chat offers it after recovery; it is never the incident's fix.
+2. Execute runs in the background: files where the root module reads the changed flag (READ_IN) are fetched from the
+   fork, Claude (prompts.FIXER) answers with find/replace edits, `apply_edits` accepts them only if each matches once.
+3. `codebase/github.py` creates branch `rootcause/<incident>-<ts>`, commits the files and opens the PR on
+   `RC_PR_REPO` only, with the graph's evidence in the description; `create_pull_request` records FIXES / CHANGES.
+4. Guard rails: approval token as for every action, one PR per `code.pr_cooldown_minutes`, never merges, says the
+   code was not run. Tested with a fake Claude and a fake GitHub (unit + graph test) and clicked through in the UI.
+
 ### M8 Agent and MCP
 1. `tools.py` implements every tool once; the MCP server, autopilot and the LLM agent share it.
 2. The MCP server reads the graph directly and forwards write tools to the API, so side effects happen in one process.

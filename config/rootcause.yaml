@@ -108,7 +108,9 @@ verify:
 
 code:                                        # "Connect your GitHub": explanation only, never a ranking input
   repo: null                                 # scanned on first start if set (env RC_CODE_REPO overrides)
-  allowed_repos:                             # replay mode (public site) only scans these
+  pr_repo: null                              # owner/repo of OUR fork: the only repo fix PRs are opened on (+ GITHUB_TOKEN)
+  pr_cooldown_minutes: 10                    # at most one fix PR per this many minutes (public site)
+  allowed_repos:                             # replay mode (public site) only scans these (+ the pr_repo fork)
     - https://github.com/open-telemetry/opentelemetry-demo
 
 replay:

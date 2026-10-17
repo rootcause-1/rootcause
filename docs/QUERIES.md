@@ -38,6 +38,7 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `create_container_change` | [create_container_change.cypher](../backend/rootcause/graph/queries/create_container_change.cypher) | Record a container Change (restart / die) from docker events and link it to the Container | - |
 | `create_flag_change` | [create_flag_change.cypher](../backend/rootcause/graph/queries/create_flag_change.cypher) | Record a feature-flag Change (from -> to) and link it to the FeatureFlag it CHANGED | - |
 | `create_incident` | [create_incident.cypher](../backend/rootcause/graph/queries/create_incident.cypher) | Create a new open Incident for a new BLAMES component | - |
+| `create_pull_request` | [create_pull_request.cypher](../backend/rootcause/graph/queries/create_pull_request.cypher) | Fix it in code: the pull request RootCause opened, which incident it FIXES and which code module it CHANGES | - |
 | `create_report` | [create_report.cypher](../backend/rootcause/graph/queries/create_report.cypher) | Save the post-incident Report and link it with HAS_REPORT | - |
 | `decay_stale` | [decay_stale.cypher](../backend/rootcause/graph/queries/decay_stale.cypher) | Zero the live metrics of services, calls, queues and journeys with no spans in the window | - |
 | `edge_candidates` | [edge_candidates.cypher](../backend/rootcause/graph/queries/edge_candidates.cypher) | Connection causes: a caller's calls fail while the callee's server traffic vanished (<= 10% of its baseline), | - |
@@ -58,6 +59,7 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `incident_alert_snapshot` | [incident_alert_snapshot.cypher](../backend/rootcause/graph/queries/incident_alert_snapshot.cypher) | Flat alert table for an incident (input to the chaos baselines: loudest, first, highest-error, LLM-no-graph) | - |
 | `incident_count` | [incident_count.cypher](../backend/rootcause/graph/queries/incident_count.cypher) | Count incidents (next INC-xxxx number) | - |
 | `journeys_requiring` | [journeys_requiring.cypher](../backend/rootcause/graph/queries/journeys_requiring.cypher) | Journeys with a critical REQUIRES edge to any of the given services (prediction: broken journeys) | - |
+| `last_pull_request` | [last_pull_request.cypher](../backend/rootcause/graph/queries/last_pull_request.cypher) | Fix it in code: when RootCause last opened a pull request (cooldown for the public site) | - |
 | `link_chaos_incident` | [link_chaos_incident.cypher](../backend/rootcause/graph/queries/link_chaos_incident.cypher) | Snapshot the incident a chaos run PRODUCED into the eval graph | - |
 | `link_impact` | [link_impact.cypher](../backend/rootcause/graph/queries/link_impact.cypher) | Replace an incident's IMPACTED {pct} edges to journeys | - |
 | `link_incident_change` | [link_incident_change.cypher](../backend/rootcause/graph/queries/link_incident_change.cypher) | Point an incident's CAUSED_BY at the changes that hit its root cause | - |

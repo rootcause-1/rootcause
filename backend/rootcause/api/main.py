@@ -24,6 +24,7 @@ from rootcause import company, facts
 from rootcause.actions import pager
 from rootcause.actions.flagd import read_config
 from rootcause.chaos.runner import ChaosRunner, load_catalogue
+from rootcause.codebase import fix as code_fix
 from rootcause.codebase import repo as code_repo
 from rootcause.codebase import store as codebase
 from rootcause.engine import predict
@@ -355,6 +356,12 @@ def _code_repo_default() -> str | None:
     return os.environ.get("RC_CODE_REPO") or get_settings().c("code", "repo")
 
 
+def _allowed_repos() -> list[str]:
+    s = get_settings()
+    fork = code_fix.pr_repo(s)
+    return [*s.c("code", "allowed_repos", default=[]), *([f"https://github.com/{fork}"] if fork else [])]
+
+
 async def _scan_code(url: str) -> None:
     S.code.update(running=True, url=url, error=None)
     try:
@@ -377,7 +384,8 @@ async def code_get() -> dict[str, Any]:
     """The scanned repository as the graph holds it: modules, what they implement and declare, drift."""
     return await codebase.overview(S.rt.db, get_settings().non_candidates) | {
         "scan": S.code, "suggested": _code_repo_default(),
-        "allowed": get_settings().c("code", "allowed_repos", default=[]) if get_settings().rc_mode == "replay" else None}
+        "allowed": _allowed_repos() if get_settings().rc_mode == "replay" else None,
+        "fix_pr": {"repo": code_fix.pr_repo(get_settings()), "missing": code_fix.enabled(get_settings())}}
 
 
 @app.post("/api/code/scan")
@@ -387,7 +395,7 @@ async def code_scan(body: ScanReq) -> dict[str, Any]:
         code_repo.parse_url(body.url)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-    allowed = get_settings().c("code", "allowed_repos", default=[])
+    allowed = _allowed_repos()
     if get_settings().rc_mode == "replay" and body.url.rstrip("/") not in [a.rstrip("/") for a in allowed]:
         raise HTTPException(403, "the public replay site only scans: " + ", ".join(allowed))
     if S.code["running"]:

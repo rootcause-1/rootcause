@@ -5,11 +5,13 @@ Proposals for an incident's top hypothesis:
 2. revert each flag change linked to the incident (CAUSED_BY) — risk low,
 3. run a runbook automation for the root (a URL the owning team registered in company setup) — risk as declared,
 4. restart the root service's container — risk from betweenness/statefulness,
-5. page the owning team — risk none, always last (it informs, it does not fix).
+5. open a fix pull request (codebase/fix.py) when a scanned repo locates the code — a follow-up offered after
+   recovery; it changes nothing until a person merges it,
+6. page the owning team — risk none, always last (it informs, it does not fix).
 Fixing actions are ordered by risk, then expected effectiveness (revert > automation > restart).
 
 Queries: create_action, clear_proposed_actions, get_action, set_action_props, set_incident_props, who_owns,
-runbook_automations
+runbook_automations, last_pull_request
 (+ the queries behind facts.py, safety.py, memory.py). In replay mode actions are simulated: logged, not executed,
 and the replay player is told so it can jump to the recording's recovery segment.
 """
@@ -27,14 +29,17 @@ import httpx
 
 from rootcause import facts
 from rootcause.actions import containers, flagd, pager, report, verify
-from rootcause.engine import changes, memory, safety
+from rootcause.codebase import fix as code_fix
+from rootcause.codebase import store as codebase
+from rootcause.engine import changes, evidence, memory, safety
 from rootcause.graph.client import GraphDB
 from rootcause.settings import Settings
 from rootcause.util import dumps, new_id, now_ms
 
 log = logging.getLogger(__name__)
 TOKEN_TTL_MS = 10 * 60 * 1000
-EFFECTIVENESS = {"flag_revert": 0, "automation": 1, "restart": 2, "page": 3}
+EFFECTIVENESS = {"flag_revert": 0, "automation": 1, "restart": 2, "code_fix": 3, "page": 4}
+SIDE_ACTIONS = {"page", "code_fix"}  # not "the fix": no verify step, never simulated
 
 
 def _hash(token: str) -> str:
@@ -63,6 +68,20 @@ async def _call_automation(a: dict[str, Any]) -> dict[str, Any]:
     return {"automation": a["target"], "status_code": r.status_code}
 
 
+def _claude_writer(s: Settings) -> code_fix.Writer:
+    from rootcause.agent.loop import _client, _create
+
+    client = _client(s)
+
+    async def write(system: str, user: str) -> str:
+        resp = await _create(client, s, system=system, messages=[{"role": "user", "content": user}])
+        if resp.stop_reason == "refusal":
+            raise RuntimeError("Claude declined to write this fix")
+        return "".join(b.text for b in resp.content if b.type == "text")
+
+    return write
+
+
 class ActionService:
     def __init__(self, db: GraphDB, settings: Settings, publish: Callable[[str, Any], Awaitable[None]] | None = None,
                  on_simulated: Callable[[dict[str, Any]], Awaitable[None]] | None = None, narrator: Any = None):
@@ -72,6 +91,7 @@ class ActionService:
         self.on_simulated = on_simulated  # replay player hook
         self.narrator = narrator
         self.tasks: set[asyncio.Task[Any]] = set()
+        self.writer: code_fix.Writer | None = None  # tests inject a fake; default is Claude
 
     @property
     def simulated(self) -> bool:
@@ -132,6 +152,14 @@ class ActionService:
         if not root_service.startswith(("queue:", "db:", "cache:")):
             proposals.append({"kind": "restart", "target": root_service, "params": {},
                               "reason": f"{root_service} is the ranked root cause"})
+        if code_fix.enabled(self.s) is None:
+            code = await codebase.for_node(db, root)
+            flags = [c["target"] for c in inc["changes"] if c.get("kind") == "flag"]
+            files = code_fix.pick_files(code, flags) if code else []
+            if files:
+                repo = code_fix.pr_repo(self.s)
+                proposals.append({"kind": "code_fix", "target": code["path"], "params": {"files": files, "repo": repo},
+                                  "reason": f"the code that failed is located in {', '.join(files)}"})
         owner = await db.run("who_owns", node_id=root_service)
         team = owner[0]["team"] if owner else None
         proposals.append({"kind": "page", "target": team or "platform-team", "params": {"incident": incident_id},
@@ -153,6 +181,8 @@ class ActionService:
                 p["safety"] = await safety.assess_flag(db, p["target"])
             elif p["kind"] == "restart":
                 p["safety"] = await safety.assess_restart(db, p["target"], stateful, high_pct)
+            elif p["kind"] == "code_fix":
+                p["safety"] = safety.assess_code_fix(p["params"]["repo"], p["params"]["files"])
             elif p["kind"] == "automation":
                 p["safety"] = safety.assess_automation(p["params"]["service"], p["params"]["risk"],
                                                        p["params"]["title"])
@@ -211,6 +241,10 @@ class ActionService:
             return {"error": "approval token expired"}
         await self.db.run("set_action_props", id=action_id, props={"approval_used": True, "status": "executing"})
         a = facts._action(raw)
+        if a["kind"] == "code_fix":  # Claude + GitHub take a while: answer now, finish in the background
+            self._spawn(self._code_fix(a))
+            await self._emit("action", {"id": action_id, "status": "executing"})
+            return {"action": action_id, "status": "executing", "evidence": [a["incident_id"], a["target"]]}
         try:
             result = await self._do(a)
         except Exception as exc:
@@ -219,9 +253,10 @@ class ActionService:
             return {"error": f"execution failed: {exc}"}
         await self.db.run("set_action_props", id=action_id, props={
             "status": "executed", "executed_ts": now_ms(), "result": dumps(result), "simulated": self.simulated})
-        await self.db.run("set_incident_props", id=a["incident_id"], props={"agent_state": "verifying"})
+        if a["kind"] not in SIDE_ACTIONS:
+            await self.db.run("set_incident_props", id=a["incident_id"], props={"agent_state": "verifying"})
         await self._emit("action", {"id": action_id, "status": "executed", "result": result})
-        if a["kind"] != "page":
+        if a["kind"] not in SIDE_ACTIONS:
             self._spawn(self._verify(a["incident_id"], action_id))
         return {"action": action_id, "status": "executed", "simulated": self.simulated, "result": result,
                 "evidence": [a["incident_id"], a["target"]]}
@@ -244,6 +279,25 @@ class ActionService:
         if a["kind"] == "restart":
             return await containers.restart(self.s.c("demo", "compose_project"), a["target"])
         raise ValueError(f"unknown action kind {a['kind']}")
+
+    async def _code_fix(self, a: dict[str, Any]) -> None:
+        cooldown_ms = float(self.s.c("code", "pr_cooldown_minutes", default=10)) * 60_000
+        try:
+            last = await self.db.run("last_pull_request")
+            if last and last[0]["ts"] and now_ms() - int(last[0]["ts"]) < cooldown_ms:
+                raise RuntimeError("a fix pull request was opened a few minutes ago; try again later")
+            inc = await facts.full(self.db, a["incident_id"])
+            inc["evidence_path"] = await evidence.path(self.db, inc.get("members") or [], inc.get("root_target") or "")
+            pr = await code_fix.open_fix_pr(self.db, self.s, inc, self.writer or _claude_writer(self.s))
+        except Exception as exc:
+            log.warning("fix PR for %s failed: %s", a["incident_id"], exc)
+            await self.db.run("set_action_props", id=a["id"], props={"status": "failed", "error": str(exc)[:300]})
+            await self._emit("action", {"id": a["id"], "status": "failed", "error": str(exc)})
+            return
+        await self.db.run("set_action_props", id=a["id"], props={
+            "status": "executed", "executed_ts": now_ms(), "result": dumps(pr), "pr_url": pr["url"],
+            "pr_number": pr["number"], "pr_title": pr["title"], "pr_explanation": pr["explanation"]})
+        await self._emit("action", {"id": a["id"], "status": "executed", "result": pr})
 
     # ---------------------------------------------------------------- verify / report
     async def _verify(self, incident_id: str, action_id: str) -> None:

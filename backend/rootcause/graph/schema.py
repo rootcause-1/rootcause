@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 LABELS = [
     "Service", "Queue", "Datastore", "Container", "Journey", "Team", "Person", "Runbook", "FeatureFlag",
     "Change", "Alert", "Incident", "SignalPattern", "Hypothesis", "Action", "Prediction", "Step", "Report",
-    "ChaosRun", "Repo", "CodeModule", "RpcService", "Commit",
+    "ChaosRun", "Repo", "CodeModule", "RpcService", "Commit", "PullRequest",
 ]
 
 

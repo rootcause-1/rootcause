@@ -65,6 +65,7 @@ graph LR
 | CodeModule | id `code:<name>`, name, path, language, files, loc, owners (CODEOWNERS), kind (code/image) | codebase scan |
 | RpcService | name, methods, file | codebase scan (.proto) |
 | Commit | id = sha, ts, subject (no author names) | codebase scan (`git log` per module) |
+| PullRequest | id = url, number, branch, title, ts | fix it in code (`codebase/fix.py`) |
 
 Dynamic label: anomalous Service/Queue/Datastore nodes also carry **`:Anomalous`** (set by `create_alert`,
 removed by `resolve_alert` when no firing alert remains).
@@ -94,3 +95,4 @@ removed by `resolve_alert` when no firing alert remains).
 | `(CodeModule)-[:DECLARES]->(CodeModule)` | via (`depends_on` or the env var) | compose files; compared with CALLS in `code_drift` |
 | `(CodeModule)-[:SERVES]->(RpcService)`, `(Commit)-[:TOUCHED]->(CodeModule)` | | .proto files, git log |
 | `(FeatureFlag)-[:READ_IN]->(CodeModule)` | file, line | where the code reads a flag. Explanation only, never a ranking input |
+| `(PullRequest)-[:FIXES]->(Incident)`, `(PullRequest)-[:CHANGES]->(CodeModule)` | | the fix PR RootCause opened |

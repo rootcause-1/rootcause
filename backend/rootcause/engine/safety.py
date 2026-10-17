@@ -64,6 +64,12 @@ def assess_automation(service: str, risk: str, title: str) -> dict[str, Any]:
             "stateful": False, "reason": f"runs the {service} team's own automation \"{title}\""}
 
 
+def assess_code_fix(repo: str, files: list[str]) -> dict[str, Any]:
+    """A pull request changes nothing that runs until a person reviews and merges it."""
+    return {"risk": "low", "affected_services": [], "affected_journeys": [], "stateful": False,
+            "reason": f"opens a pull request on {repo} changing {', '.join(files)}; nothing runs until a person merges it"}
+
+
 def assess_page(team: str | None) -> dict[str, Any]:
     return {"risk": "none", "affected_services": [], "affected_journeys": [], "stateful": False,
             "reason": f"notifies {team or 'the owning team'}; changes nothing"}

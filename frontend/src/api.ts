@@ -19,6 +19,7 @@ export type Hypothesis = {
 export type Action = {
   id: string; kind: string; target: string; risk: string; rank: number; status: string; reason: string;
   incident_id: string; params: Record<string, unknown>; simulated?: boolean; executed_ts?: number; verified_ts?: number;
+  error?: string; pr_url?: string; pr_number?: number; pr_title?: string; pr_explanation?: string;
   side_effects: { affected_services?: string[]; affected_journeys?: string[]; stateful?: boolean; reason?: string };
 };
 export type Step = { id: string; n: number; tool: string; summary: string; ts: number; cited: string[] };

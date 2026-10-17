@@ -30,6 +30,15 @@ and the latest commits per module. During an incident the chat then shows the co
 `code_drift` compares the declared dependencies with the calls seen live. The code explains; it never changes
 the ranking. The public site scans only the official OpenTelemetry Demo repo (`code.allowed_repos`).
 
+## Fix it in code (pull requests)
+After an incident is fixed and verified, RootCause can also fix it **in the code**. It finds the file where the
+root-cause service reads the flag that broke it (from the scanned repo), asks Claude for a small find/replace fix,
+applies it only if every edit matches exactly once, and opens a **GitHub pull request** on our fork (`RC_PR_REPO`).
+The PR description carries the evidence path, the change and the customer impact from the graph, and the PR is
+recorded as `(:PullRequest)-[:FIXES]->(:Incident)`. It needs a human approval like every action, opens at most one
+PR per 10 minutes, never merges, and says plainly that RootCause did not run the changed code. Needs
+`ANTHROPIC_API_KEY`, `GITHUB_TOKEN` (fine-grained, the fork only) and `RC_PR_REPO`.
+
 ## Make it yours
 RootCause learns the service graph from telemetry on its own. The **Your company** tab (or `config/seed.yaml`) adds
 what only your company knows, stored as graph edges: `(:Team)-[:OWNS]->(:Service)` and on-call people (who gets
@@ -89,12 +98,12 @@ graph LR
   Commit -- TOUCHED --> CodeModule
 ```
 
-| Nodes | Service, Queue, Datastore, Container, Journey, Team, Person, Runbook, FeatureFlag, Change, Alert, Incident, SignalPattern, Hypothesis, Action, Prediction, Step, Report, ChaosRun, Repo, CodeModule, RpcService, Commit (+ dynamic `:Anomalous`) |
+| Nodes | Service, Queue, Datastore, Container, Journey, Team, Person, Runbook, FeatureFlag, Change, Alert, Incident, SignalPattern, Hypothesis, Action, Prediction, Step, Report, ChaosRun, Repo, CodeModule, RpcService, Commit, PullRequest (+ dynamic `:Anomalous`) |
 |---|---|
-| **Edges** | CALLS, CALLED_BY, PRODUCES_TO, CONSUMED_BY, USES, RUNS_IN, REQUIRES, OWNS, MEMBER_OF, FOR, REMEDIATES, AFFECTS, CHANGED, FIRED_ON, PART_OF, BLAMES (transient), ROOT_CAUSE, CAUSED_BY, IMPACTED, RESOLVED_BY, HAS_SIGNAL, SIMILAR_TO, HAS_REPORT, HAS_HYPOTHESIS, INVESTIGATED_BY, NEXT, CITED, PREDICTS, PRODUCED, CONTAINS, IMPLEMENTS, DECLARES, SERVES, READ_IN, TOUCHED |
+| **Edges** | CALLS, CALLED_BY, PRODUCES_TO, CONSUMED_BY, USES, RUNS_IN, REQUIRES, OWNS, MEMBER_OF, FOR, REMEDIATES, AFFECTS, CHANGED, FIRED_ON, PART_OF, BLAMES (transient), ROOT_CAUSE, CAUSED_BY, IMPACTED, RESOLVED_BY, HAS_SIGNAL, SIMILAR_TO, HAS_REPORT, HAS_HYPOTHESIS, INVESTIGATED_BY, NEXT, CITED, PREDICTS, PRODUCED, CONTAINS, IMPLEMENTS, DECLARES, SERVES, READ_IN, TOUCHED, FIXES, CHANGES |
 
 ## Queries and algorithms we depend on
-All 100 queries are named `.cypher` files in [backend/rootcause/graph/queries/](backend/rootcause/graph/queries/), listed
+All 102 queries are named `.cypher` files in [backend/rootcause/graph/queries/](backend/rootcause/graph/queries/), listed
 with their purpose in [docs/QUERIES.md](docs/QUERIES.md). The core ones:
 
 | Query | Algorithm | Purpose |

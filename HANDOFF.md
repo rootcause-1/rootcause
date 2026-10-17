@@ -56,6 +56,14 @@ the chat shows the code behind the root cause. The API image now installs `git` 
 compose sets `RC_CODE_REPO` to the OpenTelemetry Demo repo, so the public site scans it on first start (~20 s).
 For live mode set `code.repo` in config/rootcause.yaml or scan from the tab.
 
+And **Fix it in code** (the PatchAPI idea): after recovery the chat offers "open a pull request"; Claude writes
+the fix and RootCause opens a real PR on our fork. To switch it on (locally and on the AWS host `.env`):
+1. Fork https://github.com/open-telemetry/opentelemetry-demo into our org (e.g. `rootcause-1/opentelemetry-demo`).
+2. Create a fine-grained GitHub token for **that fork only**: Contents read/write + Pull requests read/write.
+3. `.env`: `ANTHROPIC_API_KEY=…`, `GITHUB_TOKEN=…`, `RC_PR_REPO=rootcause-1/opentelemetry-demo`, and
+   `RC_CODE_REPO=https://github.com/rootcause-1/opentelemetry-demo` so the scan reads the fork.
+4. Video flow: docs/DEMO_SCRIPT.md "Version 2".
+
 Please run, in order, and paste the outputs into `docs/PROGRESS.md`:
 1. `make lint test`: graph tests include `test_company_setup_edits_reach_ownership_and_proposals` and the
    `blame_targets` assertion. Fix anything FalkorDB-specific the small way.

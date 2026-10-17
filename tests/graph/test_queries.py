@@ -35,7 +35,7 @@ COMMON = {
     "top3": True, "ttd_ms": 1000, "incident_id": "INC-0001", "results": "{}", "miss_reason": None, "run": "R1",
     "stale_before": NOW, "exclude": [], "keep": ["journey:checkout"],
     "modules": [], "declares": [], "rpc": [], "reads": [], "commits": [],
-    "url": "https://github.com/a/b", "sha": "abc",
+    "url": "https://github.com/a/b", "sha": "abc", "number": 1, "branch": "b", "title": "t", "module": "code:x",
 }
 ROWS = {
     "upsert_services": [{"id": "x", "rps": 1.0, "err_rate": 0.0, "self_err_rate": 0.0, "p95_ms": 1.0,
@@ -294,3 +294,53 @@ async def test_codebase_in_the_graph_explains_the_root(db):
     assert ("unused", "checkout", "valkey-cart") not in drift  # checkout -> cart -> cache, but not declared target
     await store.write(db, data)  # rescans replace, never duplicate
     assert len((await store.overview(db, frozenset()))["modules"]) == 5
+
+
+async def test_fix_it_in_code_opens_a_pull_request_end_to_end(db, monkeypatch):
+    """Engine finds payment -> propose offers code_fix -> approve + execute -> fake Claude edit -> fake GitHub PR."""
+    import json as _json
+
+    from rootcause.actions.service import ActionService
+    from rootcause.codebase import fix, store
+    from tests.unit.test_code_fix import FakeGitHub, fake_gh
+
+    await fixtures.build(db)
+    await store.write(db, {
+        "url": "https://github.com/acme/shop", "sha": "abc",
+        "modules": [{"name": "payment", "path": "src/payment", "language": "JavaScript", "files": 1, "loc": 6,
+                     "owners": [], "kind": "code"}],
+        "declares": [], "rpc": [], "commits": [],
+        "flag_reads": [{"flag": "paymentFailure", "module": "payment", "file": "src/payment/charge.js", "line": 2}]})
+    [inc] = [x for x in await IncidentEngine(db, get_settings()).run(NOW) if x.get("created")]
+    assert inc["root"] == "payment"
+
+    s = get_settings().model_copy(update={"anthropic_api_key": "k", "github_token": "t"})
+    s.cfg = {**s.cfg, "code": {**(s.cfg.get("code") or {}), "pr_repo": "acme/shop", "pr_cooldown_minutes": 10}}
+    fake = FakeGitHub()
+    monkeypatch.setattr(fix, "GitHub", lambda token, repo: fake_gh(fake))
+    svc = ActionService(db, s)
+
+    async def claude(system: str, user: str) -> str:
+        assert "paymentFailure" in user and "=== src/payment/charge.js ===" in user
+        return _json.dumps({"title": "Keep payments working when paymentFailure is on",
+                            "explanation": "The flag threw an error.",
+                            "edits": [{"file": "src/payment/charge.js", "find": "    throw new Error('boom');\n",
+                                       "replace": "    return retryLater();\n"}]})
+    svc.writer = claude
+
+    proposals = (await svc.propose(inc["id"]))["actions"]
+    [code_fix] = [a for a in proposals if a["kind"] == "code_fix"]
+    assert code_fix["risk"] == "low" and code_fix["params"]["files"] == ["src/payment/charge.js"]
+    assert proposals[0]["kind"] == "flag_revert"  # the fix that stops the bleeding still comes first
+    token = (await svc.approve(code_fix["id"]))["approval_token"]
+    assert (await svc.execute(code_fix["id"], token))["status"] == "executing"
+    for t in list(svc.tasks):
+        await t
+    action = (await db.run("get_action", id=code_fix["id"]))[0]["action"]
+    assert action["status"] == "executed" and action["pr_url"] == "https://github.com/acme/shop/pull/7"
+    assert "retryLater" in fake.pushed["src/payment/charge.js"]
+    rows = await db.raw("MATCH (p:PullRequest)-[:FIXES]->(i:Incident), (p)-[:CHANGES]->(m:CodeModule) "
+                        "RETURN p.number AS n, i.id AS inc, m.id AS module", read_only=True)
+    assert rows == [{"n": 7, "inc": inc["id"], "module": "code:payment"}]
+    # a side action leaves the incident alone (no verify step)
+    assert (await db.run("get_incident", id=inc["id"]))[0]["incident"].get("agent_state") != "verifying"

@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     rc_llm_model: str = "claude-sonnet-5-5"
     rc_agent_mode: str = "autopilot"  # autopilot | llm
     pager_webhook_url: str = ""
+    github_token: str = ""  # fix-it-in-code PRs on code.pr_repo only
     rc_api_url: str = "http://localhost:8000"
     rc_mcp_url: str = "http://localhost:8811/mcp"
     rc_replay_scenario: str = ""

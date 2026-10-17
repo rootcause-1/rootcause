@@ -240,3 +240,12 @@ End to end on the real API (replay mode, paymentFailure): startup scan of open-t
 37 modules (20 with code, 26,514 lines), 83 declared dependencies, 11 gRPC services, 20 flag reads. The chat showed
 "Flag paymentFailure is read at src/payment/charge.js:40"; the autopilot trail cites `code:payment`; the scan came
 back after `POST /api/admin/reset`. URL guards: non-GitHub URL → 400, other repo on the replay site → 403.
+
+## 17 Oct (night): Fix it in code
+```
+pytest tests/unit  -> 85 passed
+pytest tests/graph -> 120 passed (incl. test_fix_it_in_code_opens_a_pull_request_end_to_end, fake Claude + fake GitHub)
+```
+Clicked through in the browser on the real API (replay paymentFailure, Claude and GitHub replaced by local fakes):
+recovery → "One more thing… fix it in the code?" → Yes → "Pull request #1 is open". Not yet run with a real
+ANTHROPIC_API_KEY / GITHUB_TOKEN (needs the fork and keys, HANDOFF §2.0).

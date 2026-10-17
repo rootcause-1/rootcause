@@ -68,13 +68,15 @@ function reasons(h: Hypothesis, inc: Incident): string[] {
 }
 
 const APPLIED = new Set(["approved", "executing", "executed", "verified", "failed"]);
+/** actions that are not "the fix": paging informs, a fix pull request is a follow-up offered after recovery */
+const SIDE = new Set(["page", "code_fix"]);
 
 export function targetStage(status: Status | null, inc: Incident | null, demo: boolean): Stage {
   if (!inc || (inc.status === "resolved" && Date.now() - (inc.resolved_ts ?? 0) > 5 * 60_000)) {
     return demo || status?.mode !== "replay" ? "healthy" : "intro";
   }
   if (inc.status === "resolved") return "recovered";
-  const applied = inc.actions.some((a) => APPLIED.has(a.status) && a.kind !== "page" && a.status !== "failed");
+  const applied = inc.actions.some((a) => APPLIED.has(a.status) && !SIDE.has(a.kind) && a.status !== "failed");
   if (applied) return "fixing";
   const top = inc.hypotheses[0];
   if (!top || inc.agent_state === "pending" || inc.agent_state === "investigating") return "investigating";
@@ -164,8 +166,9 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
   const owners = (ids: string[]) => (graph?.teams ?? []).filter((t) => t.owns.some((s) => ids.includes(s)));
   const top = inc?.hypotheses[0];
   const proposed = (inc?.actions ?? []).filter((a) => a.status === "proposed");
-  const fix = proposed.find((a) => a.kind !== "page") ?? proposed[0];
-  const applied = [...(inc?.actions ?? [])].reverse().find((a) => APPLIED.has(a.status) && a.kind !== "page");
+  const fix = proposed.find((a) => !SIDE.has(a.kind)) ?? proposed.find((a) => a.kind === "page");
+  const applied = [...(inc?.actions ?? [])].reverse().find((a) => APPLIED.has(a.status) && !SIDE.has(a.kind));
+  const codeFix = (inc?.actions ?? []).find((a) => a.kind === "code_fix");
   const inFlight = !!applied && applied.status !== "failed"; // a fix is being applied or verified: don't ask again
   const si = STAGES.indexOf(stage);
   const at = (s: Stage) => si >= STAGES.indexOf(s);
@@ -186,6 +189,13 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
   const [declined, setDeclined] = useState(false);
   const [said, setSaid] = useState<number | null>(null); // when "Yes, fix it" was sent
   const [err, setErr] = useState<string | null>(null);
+  const [prAsked, setPrAsked] = useState<"yes" | "no" | null>(null);
+  useEffect(() => { setPrAsked(null); }, [codeFix?.id]);
+  async function openPr() {
+    if (!codeFix || prAsked) return;
+    setPrAsked("yes");
+    try { await api.approve(codeFix.id); onChanged(); } catch (e) { setErr((e as Error).message); setPrAsked(null); }
+  }
   useEffect(() => { setLeft(AUTO_APPROVE_S); setDeclined(false); setErr(null); if (!inFlight) setSaid(null); }, [fix?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!canAuto || declined || busy || said) return;
@@ -202,7 +212,7 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
 
   // keep the newest message in view (after the bubble has rendered and animated in)
   const body = useRef<HTMLDivElement>(null);
-  const scrollKey = `${si}|${typing}|${inc?.steps.length}|${applied?.status}|${said}|${declined}|${inc?.alerts.filter((a) => a.status === "resolved").length}`;
+  const scrollKey = `${si}|${typing}|${inc?.steps.length}|${applied?.status}|${said}|${declined}|${inc?.alerts.filter((a) => a.status === "resolved").length}|${codeFix?.status}|${prAsked}`;
   useEffect(() => {
     const go = () => body.current?.scrollTo({ top: body.current.scrollHeight, behavior: "smooth" });
     go();
@@ -329,6 +339,40 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
           {replay && <button className="rounded-full border border-eucalyptus/30 bg-white px-3 py-1 text-[13px] text-eucalyptus" onClick={onStart}>▶ Run it again</button>}
         </div>
       </Bubble>);
+
+    // fix it in code: a pull request so the same failure can't hurt customers again
+    if (codeFix) {
+      const files = (codeFix.params?.files as string[] | undefined) ?? [codeFix.target];
+      const repo = String(codeFix.params?.repo ?? "your repo");
+      msgs.push(
+        <Bubble key="pr-offer" time={inc.resolved_ts}>
+          <p>🛠️ <b>One more thing.</b> The switch is off, but the code that failed is still there. Want me to fix it in the code?
+            I'll change <span className="font-mono text-[12.5px]">{files.join(", ")}</span> and open a pull request on <b>{repo}</b> for
+            your team to review. Nothing changes until someone merges it.</p>
+          {codeFix.status === "proposed" && !prAsked && (
+            <div className="mt-2 flex gap-2">
+              <button className="rounded-full bg-eucalyptus px-3 py-1 text-[13px] font-medium text-white" onClick={openPr}>Yes, open a pull request</button>
+              <button className="rounded-full border border-black/10 bg-white px-3 py-1 text-[13px]" onClick={() => setPrAsked("no")}>No thanks</button>
+            </div>
+          )}
+        </Bubble>);
+      if (prAsked === "no" && codeFix.status === "proposed") msgs.push(<Bubble key="pr-no" me time={Date.now()}>No thanks</Bubble>);
+      if (prAsked === "yes" || codeFix.status !== "proposed") {
+        msgs.push(<Bubble key="pr-yes" me time={codeFix.executed_ts ?? Date.now()}>Yes, open a pull request</Bubble>);
+        if (codeFix.status === "executed" && codeFix.pr_url) msgs.push(
+          <Bubble key="pr-done" time={codeFix.executed_ts}>
+            <p>✅ <b>Pull request #{codeFix.pr_number} is open:</b>{" "}
+              <a className="text-[#027EB5] underline" href={codeFix.pr_url} target="_blank" rel="noreferrer">{codeFix.pr_title}</a></p>
+            {codeFix.pr_explanation && <p className="mt-1 text-[13.5px]">{codeFix.pr_explanation}</p>}
+            <p className="mt-1 text-[11.5px] muted">Written by Claude from the incident facts, with the evidence path and impact in the PR description.
+              I didn't run the changed code: your CI and a reviewer decide.</p>
+          </Bubble>);
+        else if (codeFix.status === "failed") msgs.push(
+          <Bubble key="pr-fail" time={Date.now()}>I couldn't open the pull request: {codeFix.error ?? "unknown error"}</Bubble>);
+        else msgs.push(
+          <Bubble key="pr-wait" time={Date.now()}>✍️ Reading the code, writing the change with Claude and opening the pull request… <span className="typing-dots" aria-hidden><i /><i /><i /></span></Bubble>);
+      }
+    }
   }
 
   const asking = stage === "fix" && !!fix && !said && !declined && !inFlight;
