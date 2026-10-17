@@ -1,0 +1,40 @@
+{
+  "voice": "Heera",
+  "rate": 1.05,
+  "scenes": [
+    {"scene": "cold", "lines": [
+      {"id": "cold_1", "text": "It's two forty in the morning. Four alarms just went off, across two teams."},
+      {"id": "cold_2", "text": "Only one of them is the real problem. Which one?"}
+    ]},
+    {"scene": "problem", "lines": [
+      {"id": "problem_1", "text": "In a modern company, one broken service sets off alarms everywhere it is connected."},
+      {"id": "problem_2", "text": "The usual rule, trust the loudest or the first alarm, picks the right service only forty percent of the time. And every minute of guessing is a minute customers can't pay."}
+    ]},
+    {"scene": "title", "lines": [
+      {"id": "title_1", "text": "This is RootCause. An AI on-call engineer that finds the one real cause, explains it in plain words, and fixes it once you say yes."}
+    ]},
+    {"scene": "graph", "lines": [
+      {"id": "graph_1", "text": "Under the hood, everything is a graph in FalkorDB. Every request becomes nodes and edges: the services, the calls between them, the teams that own them, the customers who use them, and every change."},
+      {"id": "graph_2", "text": "When alarms fire, blame flows along the calls. A failing service blames the one it depends on."},
+      {"id": "graph_3", "text": "Alarms that are connected become one incident. That's connected components."},
+      {"id": "graph_4", "text": "PageRank finds where all the blame ends up. The shortest path through the blame is the evidence, and a change made minutes earlier is the why."}
+    ]},
+    {"scene": "demo", "lines": [
+      {"id": "demo_healthy", "stage": "healthy", "text": "Here's a real run, replayed from the OpenTelemetry Demo shop. Customers on the left, every service grouped by the team that owns it. The moving dots are real requests."},
+      {"id": "demo_alerts", "stage": "alerts", "text": "A fault hits. Four alarms across two teams. RootCause messages the on-call engineer, like a colleague on WhatsApp."},
+      {"id": "demo_investigating", "stage": "investigating", "text": "It knows the alarms are one problem, and its agent walks the graph, step by step."},
+      {"id": "demo_root", "stage": "root", "text": "Root cause: Payments. The failures start there, nothing it depends on is failing, the blame flows to it, and a feature flag changed just before."},
+      {"id": "demo_impact", "stage": "impact", "text": "It also shows who is hurt: customers trying to check out."},
+      {"id": "demo_fix", "stage": "fix", "text": "Should I fix this? It proposes the lowest risk fix, switching that flag back, and says exactly what it touches."},
+      {"id": "demo_fixing", "stage": "fixing", "text": "One yes, and it applies the fix and watches every alarm clear."},
+      {"id": "demo_recovered", "stage": "recovered", "text": "Recovered, verified, and the incident report is written. Errors are back to zero."}
+    ]},
+    {"scene": "proof", "lines": [
+      {"id": "proof_1", "text": "We tested it blind. Fifteen random faults on the real demo. RootCause named the right service first eighty seven percent of the time, in a median of fifty three seconds. The usual alarm rules managed forty percent."}
+    ]},
+    {"scene": "close", "lines": [
+      {"id": "close_1", "text": "Why a graph? Because what broke is a question about connections. Connected components turn alarms into one incident. PageRank finds the cause. Breadth first search shows what a fix will touch. And shared signal patterns help it remember."},
+      {"id": "close_2", "text": "RootCause. Graph algorithms find the cause, an agent explains it, and a human says yes."}
+    ]}
+  ]
+}

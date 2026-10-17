@@ -156,6 +156,7 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
   const proposed = (inc?.actions ?? []).filter((a) => a.status === "proposed");
   const fix = proposed.find((a) => a.kind !== "page") ?? proposed[0];
   const applied = [...(inc?.actions ?? [])].reverse().find((a) => APPLIED.has(a.status) && a.kind !== "page");
+  const inFlight = !!applied && applied.status !== "failed"; // a fix is being applied or verified: don't ask again
   const si = STAGES.indexOf(stage);
   const at = (s: Stage) => si >= STAGES.indexOf(s);
 
@@ -169,22 +170,22 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
   useEffect(() => { onBlast(stage === "fix" && fix ? fix.side_effects?.affected_services ?? [] : []); }, [stage, fix?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // autoplay countdown for the demo approval (replay only, never for high-risk fixes)
-  const canAuto = replay && demo && autoplay && stage === "fix" && !!fix && fix.risk !== "high" && fix.kind !== "page";
+  const canAuto = replay && demo && autoplay && stage === "fix" && !!fix && fix.risk !== "high" && fix.kind !== "page" && !inFlight;
   const [left, setLeft] = useState(AUTO_APPROVE_S);
   const [busy, setBusy] = useState(false);
   const [declined, setDeclined] = useState(false);
   const [said, setSaid] = useState<number | null>(null); // when "Yes, fix it" was sent
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setLeft(AUTO_APPROVE_S); setDeclined(false); setErr(null); }, [fix?.id]);
+  useEffect(() => { setLeft(AUTO_APPROVE_S); setDeclined(false); setErr(null); if (!inFlight) setSaid(null); }, [fix?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!canAuto || declined || busy) return;
+    if (!canAuto || declined || busy || said) return;
     if (left <= 0) { approve(); return; }
     const timer = setTimeout(() => setLeft((s) => s - 1), 1000);
     return () => clearTimeout(timer);
   }, [canAuto, declined, busy, left]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function approve() {
-    if (!fix) return;
+    if (!fix || said || inFlight) return; // one approval per proposal
     setBusy(true); setErr(null); setSaid(Date.now());
     try { await api.approve(fix.id); onChanged(); } catch (e) { setErr((e as Error).message); setSaid(null); } finally { setBusy(false); }
   }
@@ -262,7 +263,7 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
   }
 
   if (at("fix") && inc && (fix || applied)) {
-    const a = fix ?? applied!;
+    const a = inFlight || !fix ? applied! : fix; // the question stays the one that was answered
     const se = a.side_effects ?? {};
     msgs.push(
       <Bubble key="ask" time={t("fix")}>
@@ -307,7 +308,7 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
       </Bubble>);
   }
 
-  const asking = stage === "fix" && !!fix && !said && !declined;
+  const asking = stage === "fix" && !!fix && !said && !declined && !inFlight;
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-[30px] border-[9px] border-[#1E2621] bg-[#EFE7DC] shadow-[0_30px_60px_-30px_rgba(40,30,10,0.55)]">
       {/* chat header */}
