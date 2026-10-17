@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Graph, Incident, Status } from "./api";
 import { api, subscribe } from "./api";
 import HealthStrip, { healthOf, type Health, type HealthPoint, type Marker } from "./components/HealthStrip";
-import Narrator, { STAGE_LABEL, STAGES, targetStage, useNarration } from "./components/Narrator";
+import Narrator, { Intro, STAGE_LABEL, STAGES, targetStage, useNarration } from "./components/Narrator";
 import ServiceMap from "./components/ServiceMap";
 import { C } from "./palette";
 import ChaosLab, { type ChaosRun } from "./tabs/ChaosLab";
@@ -168,15 +168,15 @@ export default function App() {
           <HealthStrip history={history} markers={markers} state={health} />
         </div>
       )}
-      <div className={`absolute z-30 ${stage === "intro"
-        ? "inset-x-4 top-1/2 mx-auto max-w-[560px] -translate-y-1/2"
-        : "inset-x-3 bottom-3 max-h-[60vh] overflow-y-auto md:inset-x-auto md:bottom-6 md:right-6 md:w-[460px] xl:w-[390px] 2xl:w-[460px] xl:max-h-[calc(100vh-380px)]"}`}>
-        <div key={stage} className="animate-[popup_.45s_ease-out]">
-          <Narrator stage={stage} status={status} inc={inc} graph={graph} demo={demo} autoplay={autoplay}
+      {stage === "intro" ? (
+        <div className="absolute inset-x-4 top-1/2 z-30 mx-auto max-w-[580px] -translate-y-1/2"><Intro onStart={startDemo} /></div>
+      ) : (
+        <div className="absolute inset-x-3 bottom-3 z-30 h-[62vh] md:inset-x-auto md:right-6 md:top-[120px] xl:top-[290px] md:bottom-5 md:h-auto md:w-[400px] xl:w-[390px] 2xl:w-[460px]">
+          <Narrator stage={stage} typing={STAGES.indexOf(target) > si} status={status} inc={inc} graph={graph} demo={demo} autoplay={autoplay}
                     onStart={startDemo} onAutoplay={setAutoplay} onChanged={refreshIncident} onCite={setCited}
                     onBlast={setBlast} onOpenReport={() => setTool("Reports")} />
         </div>
-      </div>
+      )}
       {stage === "intro" && <div className="absolute inset-0 z-20 bg-porcelain/50 backdrop-blur-[2px]" aria-hidden />}
 
       {/* tools drawer */}

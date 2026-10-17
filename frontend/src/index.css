@@ -10,8 +10,8 @@ body { @apply bg-porcelain font-sans text-pine antialiased; font-feature-setting
   @apply rounded-2xl border border-mist bg-paper/95 backdrop-blur;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 18px 40px -28px rgba(60, 50, 20, 0.35);
 }
-/* Instrument Serif has one weight: never fake-bold it */
-.font-display { font-weight: 400 !important; letter-spacing: -0.01em; }
+/* headings: Newsreader at a medium weight */
+.font-display { font-weight: 500 !important; letter-spacing: -0.015em; }
 .kicker { @apply text-[11px] font-medium uppercase tracking-[0.18em] text-pine-soft; }
 .section-title { @apply mb-2 text-[13px] font-semibold text-pine; }
 .muted { @apply text-pine-soft; }
@@ -34,3 +34,11 @@ body { @apply bg-porcelain font-sans text-pine antialiased; font-feature-setting
 @keyframes evidence-flow { to { stroke-dashoffset: -32; } }
 .evidence-flow { animation: evidence-flow 0.9s linear infinite; }
 @keyframes popup { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* WhatsApp-style chat */
+.wa-wallpaper { background-color: #EFE7DC; background-image: radial-gradient(rgba(120, 100, 70, 0.07) 1px, transparent 1px); background-size: 14px 14px; }
+.typing-dots { display: inline-flex; gap: 3px; }
+.typing-dots i { width: 6px; height: 6px; border-radius: 9999px; background: #9AA5AB; animation: typing 1.2s infinite ease-in-out; }
+.typing-dots i:nth-child(2) { animation-delay: .15s; }
+.typing-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-3px); opacity: 1; } }

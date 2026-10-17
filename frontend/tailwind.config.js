@@ -12,7 +12,7 @@ export default {
         eucalyptus: "#1F5C45", saffron: "#D98E2F", raspberry: "#D2513F", plum: "#7C66C7", lake: "#C9BBF2",
       },
       fontFamily: {
-        display: ["'Instrument Serif'", "Georgia", "serif"],
+        display: ["Newsreader", "Georgia", "serif"],
         sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
       },
