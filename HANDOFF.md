@@ -24,11 +24,40 @@ Everything below runs and is on `main`. Nothing is half-merged; there are no oth
 | Tests | `make lint test` → 162 passed | – |
 
 The two known misses (both honest, both documented): `productCatalogLockContention` ranks the database first and the
-real cause second; `kafkaQueueProblems` floods the database, which forms its own incident.
+real cause second (a general fix is in, see §2.0, waiting for a Docker run); `kafkaQueueProblems` floods the database, which forms its own incident.
 
 ---
 
 ## 2. What is left (in priority order)
+
+### 0. NEW (17 Oct, Shambhvi + Claude Code), Yash please run on Docker first
+
+The main demo should be the "4 teams, 1 cause" story: `productCatalogLockContention` makes **12 alarms on 6 services
+owned by 3 teams** (storefront, payments, data), and they all come from one place. Until now we ranked the database
+first (known miss). Three changes are in, **none verified against FalkorDB yet** (no Docker on Shambhvi's laptop):
+
+- **Ranking rule** (`engine/ranking.py passive_targets`, `engine/core.py`, new query `blame_targets.cypher`):
+  a database cannot break itself without a change or a resource alarm (cpu / memory / gc) of its own. So when a
+  service that changed just before onset blames a database like that, the database does not count as "something further
+  to blame" for that service. A real database fault (no upstream change) still ranks the database first. The winning
+  hypothesis stores `explains: [db ids]`, and the chat says the database is a symptom. Unit tests reproduce
+  the 0.76 vs 0.73 case. This is general: no flag names, nothing read from flagd or the catalogue.
+- **Your company tab** (`company.py`, `api/main.py /api/company*`, `frontend/src/tabs/Company.tsx`, 8 new `company_*`
+  queries): edit teams, ownership, on-call, journeys (by route) and runbooks in the graph; download as seed.yaml; reset.
+- **Runbook automations**: a runbook can have an automation URL plus a declared risk. RootCause then proposes
+  "Run automation" for the root service (ordered after flag reverts, before restarts), with the usual approval token;
+  execute POSTs the incident JSON to that URL. In replay it is simulated.
+
+Please run, in order, and paste the outputs into `docs/PROGRESS.md`:
+1. `make lint test`: graph tests include `test_company_setup_edits_reach_ownership_and_proposals` and the
+   `blame_targets` assertion. Fix anything FalkorDB-specific the small way.
+2. `make scenario-test`: the 6 golden replays must stay top-1.
+3. Live: break `productCatalogLockContention` by hand. Expect top-1 `product-catalog` and the chat line
+   "Postgres database looks slow too, but…". Then record it: `make record SCENARIO=productCatalogLockContention`
+   (3 min healthy, break, 3 min broken, fix, 2 min recovery) and commit the file in `replay/`.
+4. Make it the main demo: set `RC_REPLAY_SCENARIO` default to `productCatalogLockContention` in
+   `infra/docker-compose.replay.yml`, add it to the golden scenario tests, and update the catalogue comment (remove "KNOWN MISS").
+5. `make chaos N=15` and copy the new numbers into README "Scorecard" (never type them).
 
 1. **Record the demo video** (≤ 3 min) with `docs/DEMO_SCRIPT.md`. Easiest: open the public site, click
    **Start demo** and let it run (~3 min, the fix auto-approves after a countdown). Put the link in `README.md` (search for `TODO: add YouTube link`).

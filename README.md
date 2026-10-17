@@ -21,6 +21,13 @@ Many alerts → one incident is a **connected-components** question (`algo.WCC` 
 **betweenness**. "Have we seen this before" is **Jaccard** over shared SignalPatterns. Remove FalkorDB and none of
 these work — the graph is the engine's state, not a cache.
 
+## Make it yours
+RootCause learns the service graph from telemetry on its own. The **Your company** tab (or `config/seed.yaml`) adds
+what only your company knows, stored as graph edges: `(:Team)-[:OWNS]->(:Service)` and on-call people (who gets
+paged), `(:Journey)` routes (business impact) and `(:Runbook)-[:FOR]->(:Service)` with an optional **automation
+URL** (a webhook to your own script or workflow, proposed as a fix with its declared risk and run only after
+approval). Export the setup back to seed.yaml with one click.
+
 ## Quick start — live mode (needs Docker, ~8 GB RAM)
 ```bash
 cp .env.example .env            # add ANTHROPIC_API_KEY to use the LLM agent (optional)

@@ -14,7 +14,7 @@ export type Graph = { nodes: GraphNode[]; edges: GraphEdge[]; journeys?: Journey
 
 export type Hypothesis = {
   target: string; score: number; rank: number; depth: number; self: number; pagerank: number;
-  change: number; memory: number;
+  change: number; memory: number; explains?: string[];
 };
 export type Action = {
   id: string; kind: string; target: string; risk: string; rank: number; status: string; reason: string;
@@ -39,6 +39,15 @@ export type Status = {
   chaos?: { running: boolean; done: number; total: number; current?: string | null; batch?: string | null };
   last_error?: string | null;
 };
+
+export type CompanyPerson = { id: string; name: string; on_call: boolean; contact?: string };
+export type CompanyTeam = { id: string; name: string; owns: string[]; people: CompanyPerson[] };
+export type CompanyJourney = { id: string; name: string; routes: string[] };
+export type CompanyRunbook = {
+  id: string; service: string | null; title: string | null; url?: string | null; steps: string[] | null;
+  remediates?: string[]; automation_url: string | null; automation_risk: string | null;
+};
+export type Company = { teams: CompanyTeam[]; journeys: CompanyJourney[]; runbooks: CompanyRunbook[]; services: string[] };
 
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { headers: { "content-type": "application/json" }, ...init });
@@ -73,6 +82,11 @@ export const api = {
   chaosRun: (body: { n: number; flag?: string; mystery?: boolean }) =>
     j("/api/chaos/run", { method: "POST", body: JSON.stringify(body) }),
   scenarios: () => j<string[]>("/api/replay/scenarios"),
+  company: () => j<Company>("/api/company"),
+  saveCompany: (kind: "team" | "journey" | "runbook", item: unknown) =>
+    j("/api/company", { method: "PUT", body: JSON.stringify({ kind, item }) }),
+  deleteCompany: (id: string) => j(`/api/company/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  resetCompany: () => j("/api/company/reset", { method: "POST" }),
   startReplay: (scenario: string) =>
     j("/api/replay/start", { method: "POST", body: JSON.stringify({ scenario }) }),
 };

@@ -53,7 +53,8 @@ def seed_params(seed: dict[str, Any]) -> dict[str, Any]:
                 for j in seed.get("journeys", [])]
     runbooks = [
         {"id": r["id"], "service": r["service"], "title": r.get("title", ""), "url": r.get("url", ""),
-         "steps": r.get("steps", []), "remediates": r.get("remediates", [])}
+         "steps": r.get("steps", []), "remediates": r.get("remediates", []),
+         "automation_url": r.get("automation_url", ""), "automation_risk": r.get("automation_risk", "medium")}
         for r in seed.get("runbooks", [])
     ]
     flags = [{"id": k, "services": v} for k, v in (seed.get("flag_service_map") or {}).items()]

@@ -1,7 +1,9 @@
 """Root-cause ranking: five signals, each normalised to 0-1, combined with weights from rootcause.yaml.
 
     score = 0.30*depth + 0.25*self + 0.20*pagerank + 0.15*change + 0.10*memory
-    depth    = 1.0 if out_degree == 0 else 0.5 ** out_degree        (blame_depth)
+    depth    = 1.0 if out_degree == 0 else 0.5 ** out_degree        (blame_depth, blame_targets)
+               a changed service does not count a passive datastore it blames (no change, no resource alarm of
+               its own) as "something further to blame": the database slowed down because of it (passive_targets)
     self     = self_err_rate / max in incident, or the anomaly z-score/3 capped at 1 for non-error alerts
     pagerank = PageRank over BLAMES / max in incident                 (pagerank_blame, algo.pageRank)
     change   = 1.0 if a change hit the node <= 10 min before onset, 0.5 if <= 30 min (recent_changes_for)
@@ -32,6 +34,7 @@ class Candidate:
     rank: int = 0
     changes: list[dict[str, Any]] = field(default_factory=list)
     edge: str | None = None
+    explains: list[str] = field(default_factory=list)  # passive datastores this candidate's change explains
 
     def signals(self) -> dict[str, float]:
         return {s: round(getattr(self, s), 4) for s in SIGNALS}
@@ -39,6 +42,18 @@ class Candidate:
 
 def depth_score(out_degree: int) -> float:
     return 1.0 if out_degree <= 0 else 0.5 ** out_degree
+
+
+RESOURCE_KINDS = {"cpu", "memory", "gc"}
+
+
+def passive_targets(targets: list[str], is_datastore: dict[str, bool], changed: dict[str, float],
+                    alert_kinds: dict[str, set[str]]) -> list[str]:
+    """Blame targets that are only symptoms of a changed caller: datastores with no change of their own and no
+    resource alarm (cpu / memory / gc). A database cannot break itself without one of those; if the service that
+    uses it changed just before, the slow database is that change's effect, not something further to blame."""
+    return [d for d in targets if is_datastore.get(d) and changed.get(d, 0.0) == 0.0
+            and not (alert_kinds.get(d, set()) & RESOURCE_KINDS)]
 
 
 def zscore_self(value: float, baseline: float | None, dev: float | None) -> float:

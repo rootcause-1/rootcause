@@ -255,3 +255,38 @@ async def test_replay_gives_up_after_max_broken_loops(tmp_path):
     p = Player(path, feed)
     await p.run(warmed=True, max_loops=3)
     assert p.phase == "expired" and p.loops == 3 and not p.fixed
+
+
+def test_company_params_validate_edits():
+    import pytest
+
+    from rootcause import company
+
+    team, people = company.team_params({"name": "Search & Discovery", "owns": ["ad", "ad", " "],
+                                        "people": [{"name": "Ada Lee", "on_call": True}, {"name": ""}]})
+    assert team == {"id": "search-discovery-team", "name": "Search & Discovery", "owns": ["ad"]}
+    assert people == [{"id": "ada-lee", "name": "Ada Lee", "on_call": True, "contact": "", "team": team["id"]}]
+    assert company.team_params({"id": "payments-team", "name": "Pay"})[0]["id"] == "payments-team"
+    assert company.journey_params({"name": "Track order", "routes": ["/api/orders"]})["id"] == "journey:track_order"
+    with pytest.raises(ValueError):
+        company.journey_params({"name": "x", "routes": ["api"]})
+    rb = company.runbook_params({"service": "cart", "title": "Flush cart cache",
+                                 "automation_url": "https://ops.example/hooks/flush", "automation_risk": "low"})
+    assert rb["id"] == "rb-cart-flush-cart-cache" and rb["automation_risk"] == "low"
+    with pytest.raises(ValueError):
+        company.runbook_params({"service": "cart", "title": "x", "automation_url": "file:///etc/passwd"})
+
+
+def test_company_to_seed_round_trips_the_seed_shape():
+    from rootcause import company
+
+    setup = {"teams": [{"id": "t-team", "name": "T", "owns": ["b", "a"],
+                        "people": [{"id": "p", "name": "P", "on_call": True, "contact": "#t"}]}],
+             "journeys": [{"id": "journey:x", "name": "X", "routes": ["/x"]}],
+             "runbooks": [{"id": "rb", "service": "a", "title": "Fix a", "url": "", "steps": ["s"], "remediates": [],
+                           "automation_url": None, "automation_risk": None}],
+             "services": ["a", "b"]}
+    seed = company.to_seed(setup)
+    assert seed["teams"][0]["owns"] == ["a", "b"]
+    assert seed["runbooks"] == [{"id": "rb", "service": "a", "title": "Fix a", "steps": ["s"], "remediates": []}]
+    assert seed_params(seed)["teams"][0]["owns"] == ["a", "b"]

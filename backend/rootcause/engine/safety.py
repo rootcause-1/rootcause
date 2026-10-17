@@ -58,6 +58,12 @@ async def assess_restart(db: GraphDB, service: str, stateful_stores: list[str], 
             "stateful": stateful, "reason": reason, "betweenness_pct": round(pct, 3)}
 
 
+def assess_automation(service: str, risk: str, title: str) -> dict[str, Any]:
+    """Risk is what the owning team declared for its automation in company setup."""
+    return {"risk": risk if risk in RISK_ORDER else "medium", "affected_services": [service], "affected_journeys": [],
+            "stateful": False, "reason": f"runs the {service} team's own automation \"{title}\""}
+
+
 def assess_page(team: str | None) -> dict[str, Any]:
     return {"risk": "none", "affected_services": [], "affected_journeys": [], "stateful": False,
             "reason": f"notifies {team or 'the owning team'}; changes nothing"}

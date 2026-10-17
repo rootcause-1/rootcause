@@ -39,6 +39,9 @@ histories for slopes, SSE queues, and the replay player's cursor.
 4. Connection faults (callee traffic vanished while callers fail) add an `edge:A->B` hypothesis; a queue whose consumer
    went silent adds that consumer (an "invisible" fault).
 5. The top hypothesis gets `ROOT_CAUSE`, `CAUSED_BY` (its changes) and `IMPACTED` (journeys whose success rate dropped).
+6. Passive datastores (17 Oct): a database with no change and no cpu/memory/gc alarm can't be the reason a changed
+   service fails, so it doesn't lower that service's depth (`blame_targets`, `ranking.passive_targets`). The
+   hypothesis records which databases it `explains`.
 
 ### M6 Actions
 1. Proposals: memory-backed fixes first, then flag revert (low risk), container restart (risk from betweenness and
@@ -61,6 +64,14 @@ histories for slopes, SSE queues, and the replay player's cursor.
    12 s countdown (a real POST /approve, labelled as a demo stand-in for a person). Live mode always waits for a human.
 5. Warm paper theme on semantic tokens (serif headings, mono detail), services drawn as isometric boxes, vitals card with a failing-requests timeline, tools (break, predict, memory,
    reports) in a drawer.
+
+### Company setup and runbook automations (17 Oct)
+1. Teams, people, on-call, `OWNS`, journeys (with routes) and runbooks live in the graph, seeded from `config/seed.yaml`.
+2. The **Your company** tab edits them through `/api/company` (`company.py`, `company_*` queries). The next tick uses
+   the edits: who gets paged (`who_owns`), business impact (journey routes, refreshed in the span window) and fixes.
+3. A runbook can register an automation URL with a declared risk. It becomes a proposed action (`runbook_automations`)
+   that needs the same single-use approval token. Execute POSTs the incident to the URL (simulated in replay).
+4. `GET /api/company/export` writes the setup back as seed.yaml, so a company keeps it in git.
 
 ### M8 Agent and MCP
 1. `tools.py` implements every tool once; the MCP server, autopilot and the LLM agent share it.

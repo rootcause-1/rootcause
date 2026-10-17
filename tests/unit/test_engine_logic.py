@@ -39,6 +39,27 @@ def test_change_score_windows():
     assert ranking.change_score([onset + 5 * 60_000], onset, 10, 30) == 0.0
 
 
+def test_passive_datastore_is_a_symptom_of_a_changed_caller():
+    stores = {"db:astronomy-db": True, "product-catalog": False}
+    kinds = {"db:astronomy-db": {"latency", "error_rate"}}
+    # the caller changed, the database did not and has no resource alarm -> the database is explained
+    assert ranking.passive_targets(["db:astronomy-db"], stores, {"db:astronomy-db": 0.0}, kinds) == ["db:astronomy-db"]
+    # the database changed itself, or shows a resource alarm, or the target is a service -> not passive
+    assert ranking.passive_targets(["db:astronomy-db"], stores, {"db:astronomy-db": 1.0}, kinds) == []
+    assert ranking.passive_targets(["db:astronomy-db"], stores, {}, {"db:astronomy-db": {"memory"}}) == []
+    assert ranking.passive_targets(["product-catalog"], stores, {}, {}) == []
+
+
+def test_lock_contention_shape_ranks_the_changed_service_over_its_database():
+    w = {"depth": 0.30, "self": 0.25, "pagerank": 0.20, "change": 0.15, "memory": 0.10}
+    db = ranking.Candidate("db:astronomy-db", "db:astronomy-db", depth=1.0, self=0.9, pagerank=1.0)
+    cat = ranking.Candidate("product-catalog", "product-catalog", depth=0.5, self=0.8, pagerank=0.9, change=1.0)
+    assert ranking.rank([db, cat], w)[0].target == "db:astronomy-db"  # the old miss
+    cat.depth = ranking.depth_score(1 - len(ranking.passive_targets(
+        ["db:astronomy-db"], {"db:astronomy-db": True}, {"db:astronomy-db": 0.0}, {})))
+    assert ranking.rank([db, cat], w)[0].target == "product-catalog"
+
+
 def test_self_signal_error_vs_zscore():
     alerts = [{"target": "payment", "kind": "error_rate", "value": 0.5},
               {"target": "ad", "kind": "cpu", "value": 95, "baseline": 20, "dev": 5}]
@@ -94,6 +115,7 @@ def test_action_order_and_confirmation():
     assert ordered[0].get("from_memory")
     assert confirm_phrase({"risk": "high", "target": "cart"}) == "RESTART cart"
     assert confirm_phrase({"risk": "low", "target": "cart"}) is None
+    assert confirm_phrase({"risk": "high", "kind": "automation", "target": "rb-cart"}) == "RUN rb-cart"
 
 
 def test_evidence_entry_prefers_edge_services():

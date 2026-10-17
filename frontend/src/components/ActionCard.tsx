@@ -7,7 +7,7 @@ import { api } from "../api";
 const RISK: Record<string, string> = {
   none: "bg-mist text-pine", low: "bg-eucalyptus/20 text-pine", medium: "bg-saffron/20 text-pine", high: "bg-raspberry/15 text-raspberry",
 };
-const VERB: Record<string, string> = { flag_revert: "Revert flag", restart: "Restart", page: "Page" };
+const VERB: Record<string, string> = { flag_revert: "Revert flag", restart: "Restart", automation: "Run automation", page: "Page" };
 const DONE: Record<string, string> = { executed: "Applied, watching recovery…", verified: "Applied and verified: it recovered.",
   failed: "Applied, but it did not recover.", approved: "Approved, applying…" };
 
@@ -15,7 +15,7 @@ export default function ActionCard({ a, onChanged, closed }: { a: Action; onChan
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const phrase = a.risk === "high" ? `RESTART ${a.target}` : null;
+  const phrase = a.risk !== "high" ? null : a.kind === "automation" ? `RUN ${a.target}` : `RESTART ${a.target}`;
   const proposed = a.status === "proposed" && !closed;
 
   async function run(fn: () => Promise<unknown>) {

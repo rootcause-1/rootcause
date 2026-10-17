@@ -3,11 +3,13 @@
 Proposals for an incident's top hypothesis:
 1. fixes of a strong memory match (similarity >= 0.6) first,
 2. revert each flag change linked to the incident (CAUSED_BY) — risk low,
-3. restart the root service's container — risk from betweenness/statefulness,
-4. page the owning team — risk none, always last (it informs, it does not fix).
-Fixing actions are ordered by risk, then expected effectiveness (revert > restart).
+3. run a runbook automation for the root (a URL the owning team registered in company setup) — risk as declared,
+4. restart the root service's container — risk from betweenness/statefulness,
+5. page the owning team — risk none, always last (it informs, it does not fix).
+Fixing actions are ordered by risk, then expected effectiveness (revert > automation > restart).
 
-Queries: create_action, clear_proposed_actions, get_action, set_action_props, set_incident_props, who_owns
+Queries: create_action, clear_proposed_actions, get_action, set_action_props, set_incident_props, who_owns,
+runbook_automations
 (+ the queries behind facts.py, safety.py, memory.py). In replay mode actions are simulated: logged, not executed,
 and the replay player is told so it can jump to the recording's recovery segment.
 """
@@ -21,6 +23,8 @@ import secrets
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import httpx
+
 from rootcause import facts
 from rootcause.actions import containers, flagd, pager, report, verify
 from rootcause.engine import changes, memory, safety
@@ -30,7 +34,7 @@ from rootcause.util import dumps, new_id, now_ms
 
 log = logging.getLogger(__name__)
 TOKEN_TTL_MS = 10 * 60 * 1000
-EFFECTIVENESS = {"flag_revert": 0, "restart": 1, "page": 2}
+EFFECTIVENESS = {"flag_revert": 0, "automation": 1, "restart": 2, "page": 3}
 
 
 def _hash(token: str) -> str:
@@ -44,7 +48,19 @@ def order(proposals: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def confirm_phrase(action: dict[str, Any]) -> str | None:
-    return f"RESTART {action['target']}" if action.get("risk") == "high" else None
+    if action.get("risk") != "high":
+        return None
+    return f"RUN {action['target']}" if action.get("kind") == "automation" else f"RESTART {action['target']}"
+
+
+async def _call_automation(a: dict[str, Any]) -> dict[str, Any]:
+    """POST the incident to the runbook's automation URL (the team's own script / job / workflow)."""
+    p = a["params"]
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(p["url"], json={"incident": a["incident_id"], "service": p["service"],
+                                              "runbook": a["target"], "action": a["id"], "reason": a.get("reason")})
+    r.raise_for_status()
+    return {"automation": a["target"], "status_code": r.status_code}
 
 
 class ActionService:
@@ -108,6 +124,11 @@ class ActionService:
                                       "params": {"variant": ch["from_variant"], "change": ch["change"]},
                                       "reason": f"{ch['flag']} changed {ch['from_variant']} → {ch['to']} right before "
                                                 f"onset and affects {node} (suspect #{h['rank']})"})
+        for rb in await db.run("runbook_automations", node_id=root_service):
+            proposals.append({"kind": "automation", "target": rb["id"],
+                              "params": {"url": rb["url"], "service": root_service, "risk": rb["risk"],
+                                         "title": rb["title"]},
+                              "reason": f"the {root_service} runbook \"{rb['title']}\" has an automation"})
         if not root_service.startswith(("queue:", "db:", "cache:")):
             proposals.append({"kind": "restart", "target": root_service, "params": {},
                               "reason": f"{root_service} is the ranked root cause"})
@@ -132,6 +153,9 @@ class ActionService:
                 p["safety"] = await safety.assess_flag(db, p["target"])
             elif p["kind"] == "restart":
                 p["safety"] = await safety.assess_restart(db, p["target"], stateful, high_pct)
+            elif p["kind"] == "automation":
+                p["safety"] = safety.assess_automation(p["params"]["service"], p["params"]["risk"],
+                                                       p["params"]["title"])
             else:
                 p["safety"] = safety.assess_page(p["target"])
             p["risk"] = p["safety"]["risk"]
@@ -215,6 +239,8 @@ class ActionService:
             if not path:
                 raise RuntimeError("FLAGD_CONFIG_PATH not set")
             return await asyncio.to_thread(flagd.set_variant, path, a["target"], a["params"]["variant"])
+        if a["kind"] == "automation":
+            return await _call_automation(a)
         if a["kind"] == "restart":
             return await containers.restart(self.s.c("demo", "compose_project"), a["target"])
         raise ValueError(f"unknown action kind {a['kind']}")

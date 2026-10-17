@@ -33,7 +33,7 @@ COMMON = {
     "action": None, "resolution": "test", "markdown": "# r", "path": "r.md", "similar": [], "batch": "b",
     "variant": "on", "truth": "payment", "class": "errors", "seed": 1, "verdict": "payment", "top1": True,
     "top3": True, "ttd_ms": 1000, "incident_id": "INC-0001", "results": "{}", "miss_reason": None, "run": "R1",
-    "stale_before": NOW, "exclude": [],
+    "stale_before": NOW, "exclude": [], "keep": ["journey:checkout"],
 }
 ROWS = {
     "upsert_services": [{"id": "x", "rps": 1.0, "err_rate": 0.0, "self_err_rate": 0.0, "p95_ms": 1.0,
@@ -91,6 +91,8 @@ async def test_blames_and_wcc_group_one_incident(db):
     assert comps == [sorted([*FAILING, "cart"])]
     depth = {r["id"]: r["out_degree"] for r in await db.run("blame_depth", members=FAILING)}
     assert depth["payment"] == 0 and depth["frontend-proxy"] == 1
+    targets = {r["id"]: r["targets"] for r in await db.run("blame_targets", members=FAILING)}
+    assert "payment" not in targets and len(targets["frontend-proxy"]) == 1
 
 
 async def test_pagerank_favours_payment(db):
@@ -226,3 +228,31 @@ async def test_ui_snapshot_journeys_and_teams(db):
     teams = {r["id"]: r for r in await db.run("graph_teams")}
     assert "payment" in teams["payments-team"]["owns"]
     assert teams["payments-team"]["on_call"] == ["Asha Rao"]
+
+
+async def test_company_setup_edits_reach_ownership_and_proposals(db):
+    from rootcause import company
+
+    await fixtures.build(db)
+    await company.save_team(db, {"id": "payments-team", "name": "Payments",
+                                 "owns": ["checkout"], "people": [{"name": "New Person", "on_call": True}]})
+    owner = await db.run("who_owns", node_id="payment")
+    assert not owner or owner[0]["team"] != "payments-team"  # ownership moved away from payment
+    owners = await db.run("who_owns", node_id="checkout")
+    assert owners[0]["team"] == "payments-team" and [p["name"] for p in owners[0]["people"]] == ["New Person"]
+
+    await company.save_runbook(db, {"service": "payment", "title": "Drain payment", "automation_risk": "low",
+                                    "automation_url": "https://ops.example/drain"})
+    auto = await db.run("runbook_automations", node_id="payment")
+    assert [(a["title"], a["risk"]) for a in auto] == [("Drain payment", "low")]
+
+    await company.save_journey(db, {"name": "Track order", "routes": ["/api/orders"]})
+    setup = await company.get(db, frozenset())
+    assert "journey:track_order" in {j["id"] for j in setup["journeys"]}
+    assert "payment" in setup["services"]
+
+    await company.delete(db, "journey:track_order")
+    await company.reset(db, get_settings().seed)
+    teams = {t["id"]: t for t in (await company.get(db, frozenset()))["teams"]}
+    assert "payment" in teams["payments-team"]["owns"]
+    assert not await db.run("runbook_automations", node_id="payment")

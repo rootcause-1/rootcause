@@ -109,13 +109,28 @@ class IncidentEngine:
             c.changes = found
             c.change = ranking.change_score([int(x["ts"]) for x in found], onset_ms, strong, weak)
 
+        # a changed service is not "further" from the cause than a passive datastore it is slowing down
+        targets = {r["id"]: r["targets"] for r in await db.run("blame_targets", members=members)}
+        is_store = {m: "Datastore" in (depth_rows.get(m, {}).get("labels") or []) for m in members}
+        kinds: dict[str, set[str]] = {}
+        for a in member_alerts:
+            kinds.setdefault(a["target"], set()).add(a["kind"])
+        changed = {c.target: c.change for c in cands.values()}
+        for c in cands.values():
+            if c.edge or c.change < 0.5 or c.target not in targets:
+                continue
+            passive = ranking.passive_targets(targets[c.target], is_store, changed, kinds)
+            if passive:
+                c.explains = passive
+                c.depth = ranking.depth_score(len(targets[c.target]) - len(passive))
+
         sims = await memory.similar(db, inc_id)
         for c in cands.values():
             c.memory = max((s["jaccard"] for s in sims if s.get("root") == c.target), default=0.0)
 
         ranked = ranking.rank(list(cands.values()), self.weights, disabled)
         hyps = [{"id": f"{inc_id}:H{c.rank}", "target": c.target, "score": c.score, "rank": c.rank,
-                 **c.signals()} for c in ranked[:10]]
+                 "explains": c.explains or None, **c.signals()} for c in ranked[:10]]
         await db.run("write_hypotheses", id=inc_id, hyps=hyps, now=now_ms)
 
         summary: dict[str, Any] = {"id": inc_id, "status": "open", "members": members, "hypotheses": hyps,

@@ -9,8 +9,17 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `add_step` | [add_step.cypher](../backend/rootcause/graph/queries/add_step.cypher) | Append an investigation Step to an incident's trail (NEXT chain + CITED evidence nodes) | - |
 | `anomalous_nodes` | [anomalous_nodes.cypher](../backend/rootcause/graph/queries/anomalous_nodes.cypher) | Ids of all currently :Anomalous nodes (prediction precision/recall) | - |
 | `blame_depth` | [blame_depth.cypher](../backend/rootcause/graph/queries/blame_depth.cypher) | Out/in degree of each incident member in BLAMES (out_degree 0 = deepest, nothing further to blame) | - |
+| `blame_targets` | [blame_targets.cypher](../backend/rootcause/graph/queries/blame_targets.cypher) | Which incident members each member BLAMES (to tell real dependencies from symptoms of a change) | - |
 | `blames_count` | [blames_count.cypher](../backend/rootcause/graph/queries/blames_count.cypher) | Number of BLAMES edges (guards algo.WCC, which ignores filters on missing relationship types) | - |
 | `clear_proposed_actions` | [clear_proposed_actions.cypher](../backend/rootcause/graph/queries/clear_proposed_actions.cypher) | Delete an incident's not-yet-approved proposals before proposing again | - |
+| `company_clear_runbook` | [company_clear_runbook.cypher](../backend/rootcause/graph/queries/company_clear_runbook.cypher) | Company setup: drop a runbook's FOR / REMEDIATES edges before seed_runbooks writes the edited runbook again | - |
+| `company_clear_team` | [company_clear_team.cypher](../backend/rootcause/graph/queries/company_clear_team.cypher) | Company setup: drop a team's OWNS edges and its people before seed_org writes the edited team again | - |
+| `company_delete` | [company_delete.cypher](../backend/rootcause/graph/queries/company_delete.cypher) | Company setup: delete a team (with its people), a journey or a runbook | - |
+| `company_journeys` | [company_journeys.cypher](../backend/rootcause/graph/queries/company_journeys.cypher) | Company setup: customer journeys and the routes that identify them | - |
+| `company_reset` | [company_reset.cypher](../backend/rootcause/graph/queries/company_reset.cypher) | Company setup: forget edited teams, people and runbooks, and journeys not in $keep (before re-seeding) | - |
+| `company_runbooks` | [company_runbooks.cypher](../backend/rootcause/graph/queries/company_runbooks.cypher) | Company setup: runbooks, the service each is FOR, what it REMEDIATES and its optional automation hook | - |
+| `company_services` | [company_services.cypher](../backend/rootcause/graph/queries/company_services.cypher) | Company setup: every service the graph has seen (to assign owners and runbooks) | - |
+| `company_teams` | [company_teams.cypher](../backend/rootcause/graph/queries/company_teams.cypher) | Company setup: every team, the services it OWNS and its people (MEMBER_OF, on call) | - |
 | `create_action` | [create_action.cypher](../backend/rootcause/graph/queries/create_action.cypher) | Create a proposed remediation Action for an incident (with risk + side effects) | - |
 | `create_alert` | [create_alert.cypher](../backend/rootcause/graph/queries/create_alert.cypher) | Create a firing Alert FIRED_ON a node, mark the node :Anomalous and merge its SignalPattern | - |
 | `create_chaos_run` | [create_chaos_run.cypher](../backend/rootcause/graph/queries/create_chaos_run.cypher) | Record one blind chaos run and its scores in the rc_eval_<batch> graph | - |
@@ -56,11 +65,12 @@ FalkorDB algorithms we depend on: Jaccard over HAS_SIGNAL, algo.WCC, algo.betwee
 | `recent_container_changes_for` | [recent_container_changes_for.cypher](../backend/rootcause/graph/queries/recent_container_changes_for.cypher) | Container changes (restarts) that hit a service via Service-RUNS_IN->Container shortly before onset | - |
 | `resolve_alert` | [resolve_alert.cypher](../backend/rootcause/graph/queries/resolve_alert.cypher) | Resolve an alert and remove :Anomalous from its node when no firing alert remains on it | - |
 | `resolve_incident` | [resolve_incident.cypher](../backend/rootcause/graph/queries/resolve_incident.cypher) | Resolve an incident (status, time to resolve) and link the Action it was RESOLVED_BY | - |
+| `runbook_automations` | [runbook_automations.cypher](../backend/rootcause/graph/queries/runbook_automations.cypher) | Runbooks FOR a node that define an automation hook (a URL RootCause may call after human approval) | - |
 | `save_prediction` | [save_prediction.cypher](../backend/rootcause/graph/queries/save_prediction.cypher) | Save a what-if Prediction and its PREDICTS edges to services, queues and journeys | - |
 | `seed_flags` | [seed_flags.cypher](../backend/rootcause/graph/queries/seed_flags.cypher) | Seed the fallback FeatureFlag-AFFECTS->Service map (used when flag evaluations are not on spans) | - |
 | `seed_journeys` | [seed_journeys.cypher](../backend/rootcause/graph/queries/seed_journeys.cypher) | Seed user journeys and the routes that identify their root spans | - |
 | `seed_org` | [seed_org.cypher](../backend/rootcause/graph/queries/seed_org.cypher) | Seed teams, people and team ownership of services from config/seed.yaml | - |
-| `seed_runbooks` | [seed_runbooks.cypher](../backend/rootcause/graph/queries/seed_runbooks.cypher) | Seed runbooks, the service each is FOR and the signal patterns each REMEDIATES | - |
+| `seed_runbooks` | [seed_runbooks.cypher](../backend/rootcause/graph/queries/seed_runbooks.cypher) | Seed (or save) runbooks, the service each is FOR, the signal patterns each REMEDIATES and the automation hook | - |
 | `service_betweenness` | [service_betweenness.cypher](../backend/rootcause/graph/queries/service_betweenness.cypher) | Betweenness centrality of services in the CALLS graph (restart risk: how much traffic flows through it) | algo.betweenness |
 | `service_risk_context` | [service_risk_context.cypher](../backend/rootcause/graph/queries/service_risk_context.cypher) | Datastores a service USES and journeys that REQUIRE it (restart side effects, statefulness) | - |
 | `set_action_props` | [set_action_props.cypher](../backend/rootcause/graph/queries/set_action_props.cypher) | Merge properties onto an Action (approval token hash, status, result) | - |

@@ -30,6 +30,7 @@ const KIND: Record<string, string> = {
 export function describe(a: Action): string {
   if (a.kind === "flag_revert") return `Switch feature flag "${a.target}" back to "${String(a.params?.variant ?? "off")}"`;
   if (a.kind === "restart") return `Restart ${nameOf(a.target)}`;
+  if (a.kind === "automation") return `Run your runbook automation "${String(a.params?.title ?? a.target)}"`;
   if (a.kind === "page") return `Page the ${a.target}`;
   return `${a.kind.replace(/_/g, " ")} ${a.target}`;
 }
@@ -44,7 +45,11 @@ function reasons(h: Hypothesis, inc: Incident): string[] {
     out.push(`${nameOf(a)} keeps calling ${nameOf(b)}, but nothing answers: the connection is broken, not the code.`);
   }
   if (h.self >= 0.5) out.push(`The failures start inside ${root} itself.`);
-  if (h.depth >= 0.99) out.push(`Nothing ${root} depends on is failing, so the trail of blame stops here.`);
+  if (h.explains?.length) {
+    const dbs = h.explains.map(nameOf).join(" and ");
+    out.push(`${dbs} looks slow too, but a database cannot break on its own without a change or a resource alarm. It is slow because of ${root}.`);
+  }
+  if (h.depth >= 0.99 && !h.explains?.length) out.push(`Nothing ${root} depends on is failing, so the trail of blame stops here.`);
   if (h.pagerank >= 0.5) out.push(`Following "who fails because of whom" through the graph, the blame flows to ${root}.`);
   const ch = inc.changes[0];
   if (h.change > 0 && ch) {

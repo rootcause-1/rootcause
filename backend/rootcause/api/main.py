@@ -2,7 +2,8 @@
 
 Startup: connect to FalkorDB, create indexes, seed the graph if it has no teams, build the Runtime, then start the
 tick loop plus live sources (live mode) or the replay player (replay mode).
-Queries used directly: graph_nodes/graph_edges (via runtime), list_reports, memory_incidents, get_prediction.
+Queries used directly: graph_nodes/graph_edges (via runtime), list_reports, memory_incidents, get_prediction
+(company setup queries via company.py).
 """
 
 from __future__ import annotations
@@ -13,12 +14,13 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any
 
+import yaml
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 
-from rootcause import facts
+from rootcause import company, facts
 from rootcause.actions import pager
 from rootcause.actions.flagd import read_config
 from rootcause.chaos.runner import ChaosRunner, load_catalogue
@@ -335,6 +337,58 @@ async def admin_reset(request: Request) -> dict[str, Any]:
     if s.flagd_path:  # first observation of the flags = healthy baseline variants
         await S.rt.pipeline.feed({"type": "flag_config", "ts": now_ms(), "data": read_config(s.flagd_path)})
     return {"reset": True, "graph": S.rt.db.name}
+
+
+# --------------------------------------------------------------------------- company setup
+class CompanyEdit(BaseModel):
+    kind: str            # team | journey | runbook
+    item: dict[str, Any]
+
+
+async def _refresh_journeys() -> None:
+    S.rt.pipeline.cfg.journeys[:] = await company.journeys(S.rt.db)
+
+
+@app.get("/api/company")
+async def company_get() -> dict[str, Any]:
+    """Teams, people, ownership, journeys and runbooks as the graph holds them, plus every known service."""
+    return await company.get(S.rt.db, get_settings().non_candidates)
+
+
+@app.put("/api/company")
+async def company_save(body: CompanyEdit) -> dict[str, Any]:
+    save = {"team": company.save_team, "journey": company.save_journey, "runbook": company.save_runbook}.get(body.kind)
+    if save is None:
+        raise HTTPException(400, f"unknown kind {body.kind}")
+    try:
+        saved = await save(S.rt.db, body.item)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if body.kind == "journey":
+        await _refresh_journeys()
+    return {"saved": saved}
+
+
+@app.delete("/api/company/{node_id}")
+async def company_delete(node_id: str) -> dict[str, Any]:
+    await company.delete(S.rt.db, node_id)
+    await _refresh_journeys()
+    return {"deleted": node_id}
+
+
+@app.post("/api/company/reset")
+async def company_reset() -> dict[str, Any]:
+    await company.reset(S.rt.db, get_settings().seed)
+    await _refresh_journeys()
+    return {"reset": True}
+
+
+@app.get("/api/company/export")
+async def company_export() -> PlainTextResponse:
+    """The setup as seed.yaml (keep it in git; `make seed` loads it)."""
+    data = company.to_seed(await company.get(S.rt.db, get_settings().non_candidates))
+    data["flag_service_map"] = get_settings().seed.get("flag_service_map") or {}
+    return PlainTextResponse(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), media_type="text/yaml")
 
 
 @app.get("/api/replay/scenarios")
