@@ -43,7 +43,7 @@ The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If 
 | MCP | Official Python MCP SDK (`mcp`), `FastMCP`, transports: stdio and streamable HTTP |
 | LLM | Anthropic Python SDK, model from env `RC_LLM_MODEL` (default `claude-sonnet-5-5`), temperature 0 |
 | Containers | Docker SDK for Python (`docker`) via mounted `/var/run/docker.sock` |
-| UI | React 18 + Vite + TypeScript, plain SVG company map + popup narrator (Three.js scene removed 16 Oct at Shambhvi's request), Tailwind (dark theme, Inter), SSE (`EventSource`) |
+| UI | React 18 + Vite + TypeScript, plain SVG company map (isometric boxes) + popup narrator (Three.js scene removed 16 Oct at Shambhvi's request), Tailwind (warm paper theme, Instrument Serif + Inter + JetBrains Mono), SSE (`EventSource`) |
 | Tests | `pytest`, `pytest-asyncio`, `ruff`; FalkorDB test container for integration tests |
 | Packaging | `uv` for Python, `pnpm` for UI, `make` for everything |
 
@@ -467,7 +467,7 @@ Pool: paymentFailure, paymentUnreachable, cartFailure, adFailure, productCatalog
 
 ## 11. UI (frontend/)
 
-Single page, dark theme (Inter), readable at 1080p for the video. Built as a self-running, self-explanatory demo.
+Single page, warm paper theme (Instrument Serif headings, Inter body, JetBrains Mono detail), readable at 1080p for the video. Built as a self-running, self-explanatory demo; the map draws services as small isometric boxes.
 - **Company map** (`components/ServiceMap.tsx`, SVG) fills the page: customers (journeys) left → services in team lanes (owner + on call) → shared infrastructure. Colour = state only: green healthy, amber alerting, red root cause / failing requests; dots follow rps and error rate; evidence path animated; rings: blue = touched by the fix, purple = predicted, white = cited by an agent step.
 - **Narrator popups** (`components/Narrator.tsx`): steps unlocked by real state with a minimum read time, a step bar on top, vitals card with a failing-requests timeline. "Start demo" restarts the replay; the fix popup auto-approves low-risk fixes after a visible countdown only in replay autoplay.
 - **Agent trail drawer**: list of `Step`s; hover highlights cited nodes.

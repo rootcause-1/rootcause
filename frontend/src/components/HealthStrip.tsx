@@ -49,8 +49,9 @@ export default function HealthStrip({ history, markers, state }: { history: Heal
   const now = history[history.length - 1];
   const label = { learning: "Learning normal", healthy: "All systems normal", incident: "Incident in progress", fixing: "Fix in progress", recovered: "Recovered" }[state];
   const tone = state === "incident" ? "bg-raspberry" : state === "fixing" ? "bg-saffron" : state === "learning" ? "bg-pine-soft" : "bg-eucalyptus";
+  // (status dot + label, then the numbers; same paper card as everything else)
   const kpi = (v: string, l: string, warn = false) => (
-    <div><div className={`text-xl font-bold leading-none tabular-nums ${warn ? "text-raspberry" : ""}`}>{v}</div>
+    <div><div className={`font-display text-[34px] leading-none tabular-nums ${warn ? "text-raspberry" : ""}`}>{v}</div>
       <div className="mt-1 text-[11px] leading-tight muted">{l}</div></div>
   );
   return (
@@ -63,7 +64,7 @@ export default function HealthStrip({ history, markers, state }: { history: Heal
         {kpi(now ? now.failed.toFixed(2) : "–", "failing / s", (now?.failed ?? 0) >= 0.05)}
         {kpi(now ? String(now.alerts) : "–", "alarms firing", (now?.alerts ?? 0) > 0)}
       </div>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider muted">Failing requests, last few minutes</p>
+      <p className="kicker mt-3">failing requests · last few minutes</p>
       <Spark points={history} markers={markers} />
     </div>
   );

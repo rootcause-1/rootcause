@@ -92,7 +92,7 @@ function Tick({ done, active, failed, children, note }: { done?: boolean; active
   return (
     <li className="flex gap-3">
       <span className="mt-0.5 shrink-0">
-        {done ? <span className="grid h-5 w-5 place-items-center rounded-full bg-eucalyptus text-[11px] font-bold text-porcelain">✓</span>
+        {done ? <span className="grid h-5 w-5 place-items-center rounded-full bg-eucalyptus text-[11px] font-bold text-white">✓</span>
           : failed ? <span className="grid h-5 w-5 place-items-center rounded-full bg-raspberry text-[11px] text-white">✕</span>
           : active ? <span className="block h-5 w-5 animate-spin rounded-full border-2 border-saffron border-t-transparent" />
           : <span className="block h-5 w-5 rounded-full border-2 border-mist" />}
@@ -145,7 +145,7 @@ export default function Narrator({ stage, status, inc, graph, demo, autoplay, on
 
   if (stage === "intro") {
     kicker = "RootCause";
-    title = "The AI on-call engineer";
+    title = <>Root<span className="italic">Cause</span>, the AI on-call engineer</>;
     body = (
       <>
         <p>When something breaks in a company's systems, dozens of alarms go off at once and engineers lose precious minutes
@@ -187,9 +187,10 @@ export default function Narrator({ stage, status, inc, graph, demo, autoplay, on
         <p>It queries the graph through its tools, step by step. Hover a step to see what it looked at.</p>
         <ol className="mt-3 space-y-1.5">
           {inc.steps.slice(-6).map((s) => (
-            <li key={s.id} className="flex gap-2 rounded-lg px-2 py-1 text-sm hover:bg-white/5"
+            <li key={s.id} className="grid grid-cols-[64px_1fr] gap-2 rounded-lg px-2 py-1 text-sm hover:bg-mist/40"
                 onMouseEnter={() => onCite(s.cited)} onMouseLeave={() => onCite([])}>
-              <span className="text-eucalyptus">✓</span><span><b>{s.tool.replace(/_/g, " ")}</b> <span className="muted">{s.summary}</span></span>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-eucalyptus">agent<br /><span className="muted">{new Date(s.ts).toLocaleTimeString([], { hour12: false })}</span></span>
+              <span><span className="rounded bg-mist/60 px-1.5 py-0.5 font-mono text-[11px]">{s.tool}</span> <span className="muted">{s.summary}</span></span>
             </li>
           ))}
           {inc.steps.length === 0 && <li className="text-sm muted">Starting…</li>}
@@ -201,10 +202,14 @@ export default function Narrator({ stage, status, inc, graph, demo, autoplay, on
     title = <>Root cause: <span className="text-raspberry">{name}</span></>;
     body = (
       <>
-        <p className="muted">Ranked first of {inc.hypotheses.length} suspects · confidence {top.score.toFixed(2)} / 1</p>
-        <ul className="mt-3 space-y-1.5">{reasons(top, inc).map((r) => <li key={r} className="flex gap-2"><span className="text-raspberry">•</span>{r}</li>)}</ul>
+        <p className="font-mono text-xs muted">ranked 1 of {inc.hypotheses.length} suspects · confidence {top.score.toFixed(2)}</p>
+        <ol className="mt-3 divide-y divide-mist border-y border-mist">
+          {reasons(top, inc).map((r, i) => (
+            <li key={r} className="grid grid-cols-[28px_1fr] gap-2 py-2"><span className="font-mono text-xs muted">{String(i + 1).padStart(2, "0")}</span>{r}</li>
+          ))}
+        </ol>
         {inc.evidence_path.length > 1 && (
-          <p className="mt-3 text-sm"><span className="muted">Evidence trail on the map: </span>{inc.evidence_path.map(nameOf).join(" → ")}</p>
+          <p className="mt-3 text-sm"><span className="kicker mr-2">evidence trail</span>{inc.evidence_path.map(nameOf).join(" → ")}</p>
         )}
       </>
     );
@@ -218,8 +223,8 @@ export default function Narrator({ stage, status, inc, graph, demo, autoplay, on
       <>
         <div className="mt-1 grid grid-cols-4 gap-2 text-center">
           {[["1", "root cause"], [String(alerting.length), "services alerting"], [String(teams.length), "teams affected"], [String(hurt.length), "customer journeys hurt"]].map(([v, l], i) => (
-            <div key={l} className="rounded-xl bg-white/5 px-1 py-2">
-              <div className={`text-2xl font-bold ${i === 0 || i === 3 ? "text-raspberry" : "text-saffron"}`}>{v}</div>
+            <div key={l} className="rounded-xl border border-mist bg-white px-1 py-2">
+              <div className={`font-display text-4xl leading-none ${i === 0 || i === 3 ? "text-raspberry" : "text-saffron"}`}>{v}</div>
               <div className="text-[11px] leading-tight muted">{l}</div>
             </div>
           ))}
@@ -239,10 +244,10 @@ export default function Narrator({ stage, status, inc, graph, demo, autoplay, on
     title = "Should I fix this?";
     body = (
       <>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+        <div className="rounded-xl border border-mist bg-white p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="font-semibold">{describe(fix)}</p>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${fix.risk === "high" ? "bg-raspberry/20 text-raspberry" : "bg-eucalyptus/20 text-eucalyptus"}`}>{fix.risk} risk</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[11px] ${fix.risk === "high" ? "bg-raspberry/15 text-raspberry" : "bg-eucalyptus/10 text-eucalyptus"}`}>{fix.risk} risk</span>
           </div>
           <ul className="mt-2 space-y-1 text-sm muted">
             <li>Why: {fix.reason}</li>
@@ -261,8 +266,8 @@ export default function Narrator({ stage, status, inc, graph, demo, autoplay, on
         )}
         {canAuto && !declined && (
           <div className="mt-3">
-            <div className="h-1 overflow-hidden rounded-full bg-white/10">
-              <div className="h-1 rounded-full bg-lake transition-all duration-1000 ease-linear" style={{ width: `${(left / AUTO_APPROVE_S) * 100}%` }} />
+            <div className="h-1 overflow-hidden rounded-full bg-mist">
+              <div className="h-1 rounded-full bg-plum transition-all duration-1000 ease-linear" style={{ width: `${(left / AUTO_APPROVE_S) * 100}%` }} />
             </div>
             <p className="mt-1.5 text-xs muted">Demo autoplay: saying yes for you in {left} s. In real use a person approves every change.
               <button className="ml-1 underline" onClick={() => onAutoplay(false)}>Let me decide</button></p>
@@ -315,16 +320,32 @@ export default function Narrator({ stage, status, inc, graph, demo, autoplay, on
   }
 
   const idx = STAGES.indexOf(stage);
+  const busyNow = stage === "investigating" || stage === "fixing";
+  const strip: Partial<Record<Stage, string>> = {
+    intro: "Ready when you are", healthy: "Watching every request", alerts: "Alarms firing", grouped: "Grouping the alarms",
+    investigating: "Investigating", root: "Found the root cause", impact: "Measuring the impact", fix: "Waiting for your approval",
+    fixing: "Applying the fix", recovered: "All clear",
+  };
   return (
-    <div className="sheet w-full p-5 text-[15px] leading-relaxed shadow-2xl" role="status" aria-live="polite">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lake">{stage === "intro" ? kicker : `Step ${idx} of ${STAGES.length - 1} · ${kicker}`}</p>
+    <div className="sheet w-full overflow-hidden text-[15px] leading-relaxed" role="status" aria-live="polite">
+      <div className={`flex items-center gap-3 px-5 py-3 text-white ${stage === "alerts" || stage === "grouped" ? "bg-[#8E3B2E]" : "bg-eucalyptus"}`}>
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15">
+          <span className={`h-2.5 w-2.5 rounded-full bg-white ${busyNow || stage === "fix" ? "animate-pulse" : ""}`} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">RootCause · {strip[stage]}</p>
+          <p className="font-mono text-[11px] text-white/70">{stage === "intro" ? "replay of the OpenTelemetry Demo" : `step ${idx} of ${STAGES.length - 1}${inc ? ` · ${inc.id}` : ""}`}</p>
+        </div>
         {replay && demo && stage !== "intro" && (
-          <button className="text-xs muted hover:text-pine" onClick={() => onAutoplay(!autoplay)}>{autoplay ? "Autoplay on" : "Autoplay off"}</button>
+          <button className="rounded-md bg-white/15 px-2 py-1 font-mono text-[11px] hover:bg-white/25" onClick={() => onAutoplay(!autoplay)}>
+            {autoplay ? "autoplay on" : "autoplay off"}</button>
         )}
       </div>
-      <h2 className="mt-1 text-2xl font-bold tracking-tight">{title}</h2>
-      <div className="mt-2">{body}</div>
+      <div className="p-5">
+        <p className="kicker">{kicker}</p>
+        <h2 className="mt-1 font-display text-[32px] leading-[1.1]">{title}</h2>
+        <div className="mt-3">{body}</div>
+      </div>
     </div>
   );
 }

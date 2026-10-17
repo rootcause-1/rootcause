@@ -1,18 +1,18 @@
 // The company map: the shop's customers on the left, the services grouped by the team that owns them (with who is on
 // call), shared infrastructure at the bottom. Requests flow left -> right; one broken box visibly ripples out to the
-// teams and the customers who depend on it.
+// teams and the customers who depend on it. Drawn as small isometric boxes on paper, with requests as moving dots.
 //
 // Everything is the graph in FalkorDB, refreshed every 5 s (GET /api/graph: graph_nodes, graph_edges, graph_journeys,
 // graph_teams):
-// - customer cards = Journey nodes (requests per hour, how many are failing); a journey turns red when a service it
-//   critically REQUIRES is alerting or its success rate drops;
-// - service cards = Service / Queue / Datastore nodes, in the lane of the Team that OWNS them;
-// - dots travel along each CALLS / USES / messaging edge at its request rate; red dots = its share of failing requests;
-// - amber = alerting (:Anomalous), red = root cause, animated dashed line = evidence path; rings: blue = touched by the
-//   fix, purple = predicted to fail, white = cited by the agent step you are hovering.
+// - lilac boxes = customers (Journey nodes: requests per hour, how many fail); a journey turns coral when its success
+//   rate drops, amber "at risk" when it critically REQUIRES the root cause;
+// - grey boxes = Service / Queue / Datastore nodes, in the lane of the Team that OWNS them;
+// - dots travel along each CALLS / USES / messaging edge at its request rate; green = ok, coral = failing requests;
+// - amber box = alerting (:Anomalous), coral box = root cause, dashed coral line = evidence path; floor rings:
+//   lilac = touched by the fix, purple dashed = predicted to fail, dark = cited by the agent step you are hovering.
 import { useMemo } from "react";
 import type { Graph, GraphEdge, GraphNode, Journey, Team } from "../api";
-import { C, errColour } from "../palette";
+import { C } from "../palette";
 
 export type Overlay = { root?: string | null; path?: string[]; cited?: string[]; predicted?: string[]; blast?: string[] };
 
@@ -117,6 +117,34 @@ export function journeyState(j: Journey, root?: string | null): "hurt" | "risk" 
   return root && j.needs.includes(root) ? "risk" : "ok";
 }
 
+type Faces = readonly [string, string, string];
+
+/** An isometric box centred on (cx, cy): top, left and right faces, with a status dot on top. */
+function Cube({ cx, cy, s, faces, dot, pulse }: { cx: number; cy: number; s: number; faces: Faces; dot?: string; pulse?: boolean }) {
+  const k = s * 0.866;
+  const top = `${cx},${cy - s} ${cx + k},${cy - s / 2} ${cx},${cy} ${cx - k},${cy - s / 2}`;
+  const left = `${cx - k},${cy - s / 2} ${cx},${cy} ${cx},${cy + s} ${cx - k},${cy + s / 2}`;
+  const right = `${cx},${cy} ${cx + k},${cy - s / 2} ${cx + k},${cy + s / 2} ${cx},${cy + s}`;
+  return (
+    <g>
+      <ellipse cx={cx} cy={cy + s + 1} rx={k + 3} ry={4} fill="#000" opacity={0.06} />
+      <polygon points={left} fill={faces[1]} stroke="#00000014" strokeWidth={0.8} />
+      <polygon points={right} fill={faces[2]} stroke="#00000014" strokeWidth={0.8} />
+      <polygon points={top} fill={faces[0]} stroke="#00000014" strokeWidth={0.8} />
+      {dot && <circle cx={cx} cy={cy - s / 2} r={3.4} fill={dot} className={pulse ? "pulse-ring" : undefined} />}
+    </g>
+  );
+}
+
+/** A ring on the floor under a box (blast radius, prediction, cited step, root halo). */
+function FloorRing({ cx, cy, s, colour, dashed, pulse }: { cx: number; cy: number; s: number; colour: string; dashed?: boolean; pulse?: boolean }) {
+  return <ellipse cx={cx} cy={cy + s * 0.55} rx={s * 1.55} ry={s * 0.75} fill="none" stroke={colour} strokeWidth={2}
+                  strokeDasharray={dashed ? "5 4" : undefined} className={pulse ? "pulse-ring" : undefined} />;
+}
+
+const S = 15; // cube size
+const CX = 20; // cube centre, from the left of a slot
+
 export default function ServiceMap({ graph, overlay }: { graph: Graph | null; overlay: Overlay }) {
   const root = overlay.root?.startsWith("edge:") ? overlay.root.split("->")[1] : overlay.root;
   const rootEdge = overlay.root?.startsWith("edge:") ? overlay.root.slice(5) : null;
@@ -145,30 +173,30 @@ export default function ServiceMap({ graph, overlay }: { graph: Graph | null; ov
     const i = p.indexOf(e.source);
     return i >= 0 && p[i + 1] === e.target;
   };
+  // edges leave from the end of a slot and arrive just left of the next box
+  const into = (b: Box) => ({ x: b.x + CX - S - 4, y: b.y + H / 2 });
+  const link = (a: Box, b: Box) => (b.x > a.x ? curve(a.x + W - 6, a.y + H / 2, into(b).x, into(b).y) : edgePath(a, b));
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet" role="img"
          aria-label="Company map: customers, the services each team owns, and the calls between them">
       <defs>
-        <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
-          <path d="M0,0 L8,4 L0,8 z" fill="#3B4A66" />
+        <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#BDB8A6" />
         </marker>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" /></filter>
       </defs>
 
-      {/* column headings */}
-      <text x={PAD} y={PAD + 6} fontSize={11} fontWeight={700} letterSpacing="0.1em" fill={C.pineSoft}>CUSTOMERS</text>
-      <text x={sx - 14} y={PAD + 6} fontSize={11} fontWeight={700} letterSpacing="0.1em" fill={C.pineSoft}>TEAMS AND THE SERVICES THEY RUN</text>
+      <text x={PAD} y={PAD + 6} fontSize={10.5} fontWeight={500} letterSpacing="0.18em" fill={C.pineSoft}>CUSTOMERS</text>
+      <text x={sx - 14} y={PAD + 6} fontSize={10.5} fontWeight={500} letterSpacing="0.18em" fill={C.pineSoft}>TEAMS AND THE SERVICES THEY RUN</text>
 
-      {/* team lanes */}
+      {/* team lanes: a hairline and a label, washed coral when the team is affected */}
       {bands.map((b) => (
         <g key={b.team}>
-          <rect x={sx - 14} y={b.y} width={width - sx - PAD + 14} height={b.h} rx={14}
-                fill={b.hot ? "rgba(244,63,94,0.06)" : "rgba(148,163,184,0.04)"}
-                stroke={b.hot ? "rgba(244,63,94,0.45)" : "rgba(148,163,184,0.14)"} strokeWidth={1} />
-          <text x={sx - 2} y={b.y + 17} fontSize={11.5} fill={b.hot ? C.raspberry : C.pineSoft}>
-            <tspan fontWeight={700} letterSpacing="0.06em">{b.label.toUpperCase()}</tspan>
-            {b.onCall && <tspan dx={8}>· on call: {b.onCall}{b.hot ? " · affected" : ""}</tspan>}
+          <rect x={sx - 14} y={b.y} width={width - sx - PAD + 14} height={b.h} rx={12}
+                fill={b.hot ? "rgba(210,81,63,0.05)" : "rgba(255,255,255,0.4)"} stroke={b.hot ? "rgba(210,81,63,0.35)" : C.mist} />
+          <text x={sx - 2} y={b.y + 17} fontSize={10.5} fill={b.hot ? C.raspberry : C.pineSoft}>
+            <tspan fontWeight={600} letterSpacing="0.14em">{b.label.toUpperCase()}</tspan>
+            {b.onCall && <tspan dx={10} fontFamily="'JetBrains Mono', monospace">on call · {b.onCall}{b.hot ? " · affected" : ""}</tspan>}
           </text>
         </g>
       ))}
@@ -177,15 +205,15 @@ export default function ServiceMap({ graph, overlay }: { graph: Graph | null; ov
       {entry && pos[entry.id] && journeys.map((j) => {
         const a = jpos[j.id], b = pos[entry.id];
         const js = journeyState(j, root);
-        const hurt = js !== "ok";
-        const d = curve(a.x + JW, a.y + JH / 2, b.x, b.y + H / 2);
+        const d = curve(a.x + JW - 4, a.y + JH / 2, into(b).x, into(b).y);
         const dots = (j.rps ?? 0) > 0 ? Math.min(4, 1 + Math.floor(Math.log2(1 + (j.rps ?? 0) * 6))) : 0;
         const failing = 1 - (j.success_rate ?? 1);
-        const red = hurt && failing > 0.02 ? Math.max(1, Math.round(dots * failing)) : 0;
+        const red = js === "hurt" ? Math.max(1, Math.round(dots * failing)) : 0;
         return (
           <g key={`j>${j.id}`}>
-            <path d={d} fill="none" stroke={js === "hurt" ? C.raspberry : js === "risk" ? C.saffron : "#2A3A57"} strokeWidth={hurt ? 2 : 1.4} opacity={hurt ? 0.9 : 0.8}
-                  strokeDasharray={hurt ? "6 5" : undefined} className={hurt ? "evidence-flow" : undefined} />
+            <path d={d} fill="none" stroke={js === "hurt" ? C.raspberry : js === "risk" ? C.saffron : C.line}
+                  strokeWidth={js === "ok" ? 1.2 : 1.8} strokeDasharray={js === "ok" ? undefined : "6 5"}
+                  className={js === "ok" ? undefined : "evidence-flow"} />
             {Array.from({ length: dots }, (_, i) => (
               <circle key={i} r={2.6} fill={i < red ? C.raspberry : C.eucalyptus}>
                 <animateMotion dur="2.6s" begin={`${(-i * 2.6) / dots}s`} repeatCount="indefinite" path={d} />
@@ -199,26 +227,26 @@ export default function ServiceMap({ graph, overlay }: { graph: Graph | null; ov
       {flows.map((e) => {
         const a = pos[e.source], b = pos[e.target];
         if (!a || !b) return null;
-        const d = edgePath(a, b);
+        const d = link(a, b);
         const r = rateOf(e);
         const err = e.err_rate ?? 0;
         const path = onPath(e) || rootEdge === `${e.source}->${e.target}`;
         const involved = path || (hot.has(e.source) && hot.has(e.target));
         const dim = incident && !involved;
-        const stroke = path ? C.raspberry : err >= 0.01 ? errColour(err) : "#2A3A57";
-        const w = path ? 3 : 1 + Math.min(3, Math.log2(1 + r * 3));
+        const stroke = path || err >= 0.05 ? C.raspberry : err >= 0.01 ? C.saffron : C.line;
+        const w = path ? 2.4 : 1 + Math.min(2, Math.log2(1 + r * 2) * 0.6);
         const dots = r <= 0 ? 0 : Math.min(5, 1 + Math.floor(Math.log2(1 + r * 2)));
         const red = err >= 0.05 ? Math.max(1, Math.round(dots * err)) : 0;
-        const dur = r > 5 ? 1.6 : r > 1 ? 2.4 : r > 0.2 ? 3.4 : 5;
+        const dur = r > 5 ? 1.8 : r > 1 ? 2.6 : r > 0.2 ? 3.6 : 5.2;
         const async = e.type === "PRODUCES_TO" || e.type === "CONSUMED_BY";
         return (
-          <g key={`${e.type}:${e.source}>${e.target}`} opacity={dim ? 0.22 : 1} style={{ transition: "opacity .6s" }}>
+          <g key={`${e.type}:${e.source}>${e.target}`} opacity={dim ? 0.25 : 1} style={{ transition: "opacity .6s" }}>
             <path d={d} fill="none" stroke={stroke} strokeWidth={w} strokeLinecap="round" markerEnd="url(#arrow)"
-                  strokeDasharray={async ? "5 5" : path ? "10 6" : undefined} className={path ? "evidence-flow" : undefined}>
+                  strokeDasharray={async ? "4 4" : path ? "8 5" : undefined} className={path ? "evidence-flow" : undefined}>
               <title>{`${nameOf(e.source)} → ${nameOf(e.target)}: ${fmtRate(r)} requests/s, ${Math.round(err * 100)} % failing`}</title>
             </path>
             {Array.from({ length: dots }, (_, i) => (
-              <circle key={i} r={i < red ? 3.2 : 2.3} fill={i < red ? C.raspberry : C.eucalyptus} opacity={0.95}>
+              <circle key={i} r={i < red ? 3 : 2.3} fill={i < red ? C.raspberry : C.eucalyptus}>
                 <animateMotion dur={`${dur}s`} begin={`${(-i * dur) / dots}s`} repeatCount="indefinite" path={d} />
               </circle>
             ))}
@@ -226,55 +254,54 @@ export default function ServiceMap({ graph, overlay }: { graph: Graph | null; ov
         );
       })}
 
-      {/* customer cards */}
+      {/* customers */}
       {journeys.map((j) => {
         const p = jpos[j.id];
         const js = journeyState(j, root);
-        const hurt = js === "hurt";
         const failing = 1 - (j.success_rate ?? 1);
-        const tint = hurt ? C.raspberry : js === "risk" ? C.saffron : null;
+        const cy = p.y + JH / 2;
+        const tone = js === "hurt" ? C.raspberry : js === "risk" ? C.saffron : undefined;
         return (
-          <g key={j.id} transform={`translate(${p.x},${p.y})`}>
-            {tint && <rect x={-4} y={-4} width={JW + 8} height={JH + 8} rx={14} fill={tint} opacity={0.25} filter="url(#glow)" className="pulse-ring" />}
-            <rect width={JW} height={JH} rx={12} fill={hurt ? "#2A1420" : js === "risk" ? "#2A220E" : C.card} stroke={tint ?? "#2C3B58"} />
-            <text x={14} y={22} fontSize={14} fontWeight={600} fill={C.pine}>{j.name}</text>
-            <text x={14} y={40} fontSize={12} fill={hurt ? "#FDA4AF" : js === "risk" ? "#FCD34D" : C.pineSoft}>
-              {perHour(j.rps)} / hour{hurt ? ` · ${Math.round(failing * 100)} % failing` : js === "risk" ? " · at risk" : ""}
+          <g key={j.id}>
+            {tone && <FloorRing cx={p.x + CX} cy={cy} s={S} colour={tone} pulse />}
+            <Cube cx={p.x + CX} cy={cy} s={S} faces={C.boxUser} dot={tone} pulse />
+            <text x={p.x + 44} y={cy - 3} fontSize={13.5} fontWeight={600} fill={C.pine}>{j.name}</text>
+            <text x={p.x + 44} y={cy + 13} fontSize={10.5} fontFamily="'JetBrains Mono', monospace" fill={tone ?? C.pineSoft}>
+              {perHour(j.rps)}/hour{js === "hurt" ? ` · ${Math.round(failing * 100)}% fail` : js === "risk" ? " · at risk" : ""}
             </text>
             <title>{`${j.name}: about ${perHour(j.rps)} requests an hour, ${Math.round((j.success_rate ?? 1) * 100)} % succeed`}</title>
           </g>
         );
       })}
 
-      {/* service cards */}
+      {/* services */}
       {nodes.map((n) => {
         const p = pos[n.id];
         if (!p) return null;
         const isRoot = root === n.id;
         const alerting = hot.has(n.id);
-        const ring = overlay.cited?.includes(n.id) ? "#FFFFFF" : overlay.predicted?.includes(n.id) ? C.plum
-          : overlay.blast?.includes(n.id) ? C.lake : null;
         const err = n.err_rate ?? 0;
-        const kind = n.labels.includes("Queue") ? "queue" : n.labels.includes("Datastore") ? "store" : "service";
-        const sub = kind === "queue" ? `${n.id} · lag ${Math.round(n.lag ?? 0)}`
-          : `${n.id.replace(/^(db|cache):/, "")} · ${fmtRate(n.rps)}/s${err >= 0.005 ? ` · ${Math.round(err * 100)}% err` : ""}`;
+        const store = n.labels.includes("Datastore") || n.labels.includes("Queue");
+        const cy = p.y + H / 2, cx = p.x + CX;
+        const ring = overlay.cited?.includes(n.id) ? { c: C.pine, dashed: false } : overlay.predicted?.includes(n.id) ? { c: C.plum, dashed: true }
+          : overlay.blast?.includes(n.id) ? { c: C.lake, dashed: false } : null;
         const dim = incident && !alerting && !isRoot && !overlay.path?.includes(n.id) && !ring;
         const name = nameOf(n.id);
+        const sub = n.labels.includes("Queue") ? `${n.id} · lag ${Math.round(n.lag ?? 0)}`
+          : `${n.id.replace(/^(db|cache):/, "")} · ${fmtRate(n.rps)}/s${err >= 0.005 ? ` · ${Math.round(err * 100)}%` : ""}`;
         return (
-          <g key={n.id} transform={`translate(${p.x},${p.y})`} opacity={dim ? 0.4 : 1} style={{ transition: "opacity .6s" }}>
-            {(alerting || isRoot) && <rect x={-5} y={-5} width={W + 10} height={H + 10} rx={14} fill={isRoot ? C.raspberry : C.saffron}
-                                           opacity={isRoot ? 0.45 : 0.3} filter="url(#glow)" className="pulse-ring" />}
-            {ring && <rect x={-6} y={-6} width={W + 12} height={H + 12} rx={15} fill="none" stroke={ring} strokeWidth={2}
-                           strokeDasharray={ring === C.plum ? "6 4" : undefined} />}
-            <rect width={W} height={H} rx={kind === "store" ? 7 : 11}
-                  fill={isRoot ? "#4C0F22" : alerting ? "#33260C" : C.card}
-                  stroke={isRoot ? C.raspberry : alerting ? C.saffron : "#2C3B58"} strokeWidth={isRoot || alerting ? 1.8 : 1} />
-            <circle cx={13} cy={17} r={4} fill={isRoot ? C.raspberry : alerting ? C.saffron : err >= 0.01 ? C.saffron : C.eucalyptus} />
-            <text x={24} y={21} fontSize={13.5} fontWeight={600} fill={C.pine}>{name.length > 17 ? `${name.slice(0, 16)}…` : name}</text>
-            <text x={12} y={39} fontSize={11} fill={isRoot ? "#FDA4AF" : C.pineSoft} fontFamily="'JetBrains Mono', monospace">
-              {sub.length > 24 ? `${sub.slice(0, 23)}…` : sub}
+          <g key={n.id} opacity={dim ? 0.38 : 1} style={{ transition: "opacity .6s" }}>
+            {isRoot && <FloorRing cx={cx} cy={cy} s={S + 4} colour={C.raspberry} pulse />}
+            {ring && <FloorRing cx={cx} cy={cy} s={S + 1} colour={ring.c} dashed={ring.dashed} />}
+            <Cube cx={cx} cy={cy} s={S} faces={isRoot ? C.boxRoot : alerting ? C.boxHot : store ? C.boxStore : C.boxIdle}
+                  dot={isRoot ? C.raspberry : alerting || err >= 0.01 ? C.saffron : C.eucalyptus} pulse={isRoot || alerting} />
+            {isRoot && <text x={p.x + 44} y={cy - 18} fontSize={9.5} fontWeight={600} letterSpacing="0.16em" fill={C.raspberry}>ROOT CAUSE</text>}
+            <text x={p.x + 44} y={cy - 3} fontSize={13} fontWeight={600} fill={isRoot ? C.raspberry : C.pine}>
+              {name.length > 16 ? `${name.slice(0, 15)}…` : name}
             </text>
-            {isRoot && <text x={W - 8} y={-9} fontSize={10.5} fontWeight={700} textAnchor="end" fill={C.raspberry} letterSpacing="0.08em">ROOT CAUSE</text>}
+            <text x={p.x + 44} y={cy + 12} fontSize={10} fontFamily="'JetBrains Mono', monospace" fill={isRoot ? C.raspberry : C.pineSoft}>
+              {sub.length > 19 ? `${sub.slice(0, 18)}…` : sub}
+            </text>
             <title>{`${name} (${n.id})\n${fmtRate(n.rps)} requests/s\n${Math.round(err * 1000) / 10} % errors${n.p95_ms != null ? `\np95 ${Math.round(n.p95_ms)} ms` : ""}${alerting ? "\nALERTING" : ""}${isRoot ? "\nROOT CAUSE" : ""}`}</title>
           </g>
         );

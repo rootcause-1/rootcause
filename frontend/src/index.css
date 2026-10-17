@@ -7,16 +7,19 @@ body { @apply bg-porcelain font-sans text-pine antialiased; font-feature-setting
 
 /* one paper material for every panel that floats over the scene */
 .sheet {
-  @apply rounded-2xl border border-white/10 bg-paper/90 backdrop-blur-md;
-  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6);
+  @apply rounded-2xl border border-mist bg-paper/95 backdrop-blur;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 18px 40px -28px rgba(60, 50, 20, 0.35);
 }
+/* Instrument Serif has one weight: never fake-bold it */
+.font-display { font-weight: 400 !important; letter-spacing: -0.01em; }
+.kicker { @apply text-[11px] font-medium uppercase tracking-[0.18em] text-pine-soft; }
 .section-title { @apply mb-2 text-[13px] font-semibold text-pine; }
 .muted { @apply text-pine-soft; }
-.btn { @apply inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition disabled:opacity-35; }
-.btn-primary { @apply btn bg-lake text-[#04121F] hover:bg-sky-300; }
-.btn-ghost { @apply btn border border-pine/20 text-pine hover:bg-pine/5; }
-.field { @apply rounded-full border border-pine/20 bg-paper px-3 py-1.5 text-sm text-pine outline-none focus:border-pine; }
-:focus-visible { outline: 2px solid #38BDF8; outline-offset: 2px; }
+.btn { @apply inline-flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition disabled:opacity-35; }
+.btn-primary { @apply btn border border-plum/30 bg-lake text-pine hover:bg-[#BBA9EE]; }
+.btn-ghost { @apply btn border border-mist bg-paper text-pine hover:bg-white; }
+.field { @apply rounded-lg border border-mist bg-white px-3 py-1.5 text-sm text-pine outline-none focus:border-plum; }
+:focus-visible { outline: 2px solid #7C66C7; outline-offset: 2px; }
 
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

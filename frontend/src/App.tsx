@@ -114,26 +114,33 @@ export default function App() {
   return (
     <div className="relative h-full w-full overflow-hidden bg-porcelain">
       {/* the map is the page */}
-      <div className={`absolute inset-0 overflow-auto px-4 pb-4 pt-[112px] md:px-6 ${stage === "intro" ? "" : "xl:pr-[500px]"}`}>
+      <div className={`absolute inset-0 overflow-auto px-4 pb-4 pt-[112px] md:px-6 ${stage === "intro" ? "" : "xl:pr-[430px] 2xl:pr-[500px]"}`}>
         <div className="h-full min-h-[560px] min-w-[1000px] xl:min-w-0"><ServiceMap graph={graph} overlay={overlay} /></div>
       </div>
 
       {/* top bar */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-wrap items-center gap-3 bg-gradient-to-b from-porcelain via-porcelain/90 to-transparent px-4 pb-6 pt-3 md:px-6">
-        <div className="pointer-events-auto flex items-baseline gap-3">
-          <h1 className="text-xl font-extrabold tracking-tight">Root<span className="text-lake">Cause</span></h1>
-          <span className="hidden text-sm muted md:inline">AI on-call engineer · Astronomy Shop (OpenTelemetry Demo)</span>
-          <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold tracking-widest ${replay ? "bg-plum/15 text-plum" : "bg-eucalyptus/15 text-eucalyptus"}`}>
-            {!status ? "CONNECTING" : replay ? "REPLAY" : "LIVE"}
+        <div className="pointer-events-auto flex w-full flex-wrap items-center gap-3 rounded-2xl border border-mist bg-white/80 px-4 py-2 backdrop-blur">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-raspberry" aria-hidden />
+            <h1 className="text-[15px] font-semibold">RootCause</h1>
+            <span className="hidden font-display text-[17px] italic muted sm:inline">on call</span>
+          </div>
+          <nav className="hidden items-center rounded-xl border border-mist bg-porcelain p-0.5 md:flex">
+            {(["Map", ...TOOLS] as const).map((t) => {
+              const on = t === "Map" ? tool === null : tool === t;
+              return (
+                <button key={t} onClick={() => setTool(t === "Map" ? null : tool === t ? null : (t as Tool))} aria-pressed={on}
+                        className={`rounded-lg px-3 py-1 text-sm transition ${on ? "bg-white font-medium shadow-sm" : "muted hover:text-pine"}`}>{t}</button>
+              );
+            })}
+          </nav>
+          <span className="ml-auto hidden items-center gap-2 font-mono text-[11px] muted lg:flex">
+            <i className={`h-1.5 w-1.5 rounded-full ${replay ? "bg-plum" : "bg-eucalyptus"}`} />
+            {!status ? "connecting" : `${replay ? "replay" : "live"} · ${status.graph} · tick ${status.tick} · ${status.tick_ts ? new Date(status.tick_ts).toLocaleTimeString([], { hour12: false }) : "--"}`}
           </span>
+          {replay && <button className="btn-primary ml-auto lg:ml-0" onClick={startDemo}>{demo ? "↺ Restart demo" : "▶ Start demo"}</button>}
         </div>
-        <nav className="pointer-events-auto ml-auto flex items-center gap-1">
-          {TOOLS.map((t) => (
-            <button key={t} onClick={() => setTool(tool === t ? null : t)} aria-pressed={tool === t}
-                    className={`hidden rounded-lg px-3 py-1.5 text-sm font-medium transition md:block ${tool === t ? "bg-white/10" : "muted hover:bg-white/5 hover:text-pine"}`}>{t}</button>
-          ))}
-          {replay && <button className="btn-primary ml-2" onClick={startDemo}>{demo ? "↺ Restart demo" : "▶ Start demo"}</button>}
-        </nav>
         {/* where we are in the story */}
         {stage !== "intro" && (
           <ol className="pointer-events-auto order-last flex w-full items-center gap-1 overflow-x-auto pt-1 no-scrollbar">
@@ -142,11 +149,11 @@ export default function App() {
               const state = k < si ? "done" : k === si ? "now" : "next";
               return (
                 <li key={s} className="flex shrink-0 items-center gap-1">
-                  <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition ${
-                    state === "now" ? "bg-lake text-[#04121F]" : state === "done" ? "bg-white/10 text-pine" : "text-pine-soft/60"}`}>
+                  <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition ${
+                    state === "now" ? "bg-eucalyptus font-medium text-white" : state === "done" ? "border border-mist bg-white text-pine" : "text-pine-soft/70"}`}>
                     {state === "done" ? "✓" : <span className="tabular-nums">{k}</span>} {STAGE_LABEL[s]}
                   </span>
-                  {k < steps.length && <span className="h-px w-3 bg-white/15" aria-hidden />}
+                  {k < steps.length && <span className="h-px w-3 bg-mist" aria-hidden />}
                 </li>
               );
             })}
@@ -157,13 +164,13 @@ export default function App() {
       {/* right column (wide screens): vital signs on top, the narrator popup at the bottom; on smaller screens the
           narrator floats over the bottom of the map */}
       {stage !== "intro" && (
-        <div className="sheet absolute right-6 top-[112px] z-20 hidden w-[460px] p-4 xl:block">
+        <div className="sheet absolute right-6 top-[112px] z-20 hidden w-[390px] p-4 xl:block 2xl:w-[460px]">
           <HealthStrip history={history} markers={markers} state={health} />
         </div>
       )}
       <div className={`absolute z-30 ${stage === "intro"
         ? "inset-x-4 top-1/2 mx-auto max-w-[560px] -translate-y-1/2"
-        : "inset-x-3 bottom-3 max-h-[60vh] overflow-y-auto md:inset-x-auto md:bottom-6 md:right-6 md:w-[460px] xl:max-h-[calc(100vh-380px)]"}`}>
+        : "inset-x-3 bottom-3 max-h-[60vh] overflow-y-auto md:inset-x-auto md:bottom-6 md:right-6 md:w-[460px] xl:w-[390px] 2xl:w-[460px] xl:max-h-[calc(100vh-380px)]"}`}>
         <div key={stage} className="animate-[popup_.45s_ease-out]">
           <Narrator stage={stage} status={status} inc={inc} graph={graph} demo={demo} autoplay={autoplay}
                     onStart={startDemo} onAutoplay={setAutoplay} onChanged={refreshIncident} onCite={setCited}
@@ -175,7 +182,7 @@ export default function App() {
       {/* tools drawer */}
       {tool && (
         <aside className="sheet absolute bottom-4 right-4 top-[112px] z-40 w-[min(560px,calc(100%-32px))] overflow-y-auto p-6 md:right-6">
-          <button className="absolute right-4 top-4 rounded-lg px-2 py-1 text-sm muted hover:bg-white/5" onClick={() => setTool(null)} aria-label="Close">✕</button>
+          <button className="absolute right-4 top-4 rounded-lg px-2 py-1 text-sm muted hover:bg-mist/50" onClick={() => setTool(null)} aria-label="Close">✕</button>
           {tool === "Break something" && <ChaosLab status={status} runs={runs} />}
           {tool === "Predict" && <Predict graph={graph} onOverlay={setPredicted} />}
           {tool === "Memory" && <Memory />}

@@ -59,7 +59,7 @@ histories for slopes, SSE queues, and the replay player's cursor.
    and stays up long enough to read; the map only reveals the root cause when the narrator gets there.
 4. "Start demo" restarts the recording; in replay with autoplay on, the fix popup approves low-risk fixes after a visible
    12 s countdown (a real POST /approve, labelled as a demo stand-in for a person). Live mode always waits for a human.
-5. Dark theme on semantic tokens (Inter), vitals card with a failing-requests timeline, tools (break, predict, memory,
+5. Warm paper theme on semantic tokens (serif headings, mono detail), services drawn as isometric boxes, vitals card with a failing-requests timeline, tools (break, predict, memory,
    reports) in a drawer.
 
 ### M8 Agent and MCP
