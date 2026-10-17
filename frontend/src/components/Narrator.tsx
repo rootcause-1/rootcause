@@ -10,9 +10,14 @@
 // fixes; in live mode the narrator always waits for a person.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Action, Graph, Hypothesis, Incident, Status } from "../api";
-import { api, pct } from "../api";
+import { api, codeLink, pct } from "../api";
 import ActionCard from "./ActionCard";
 import { journeyState, nameOf, perHour } from "./ServiceMap";
+
+function ago(ts: number): string {
+  const d = Math.round((Date.now() - ts) / 86_400_000);
+  return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`;
+}
 
 export const STAGES = ["intro", "healthy", "alerts", "grouped", "investigating", "root", "impact", "fix", "fixing", "recovered"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -246,6 +251,19 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
           {reasons(top, inc).map((r, i) => <li key={r} className="grid grid-cols-[18px_1fr] text-[13.5px]"><span className="font-mono text-[11px] muted">{i + 1}.</span>{r}</li>)}
         </ol>
         {inc.evidence_path.length > 1 && <p className="mt-1.5 text-[12.5px] muted">Trail on the map: {inc.evidence_path.map(nameOf).join(" → ")}</p>}
+      </Bubble>);
+    const code = inc.code;
+    if (code?.module && code.files) msgs.push(
+      <Bubble key="code" time={t("root")}>
+        <p>📂 <b>The code behind it:</b> <span className="font-mono text-[12.5px]">{code.path}</span>{" "}
+          <span className="muted">({code.language}, {code.files} files, {code.loc?.toLocaleString()} lines{code.repo ? ` in ${code.repo.replace("https://github.com/", "")}` : ""})</span></p>
+        {(code.reads ?? []).slice(0, 2).map((r) => (
+          <p key={r.file + r.flag} className="mt-1 text-[13.5px]">Flag <b>{r.flag}</b> is read at{" "}
+            {code.repo ? <a className="font-mono text-[12.5px] text-[#027EB5] underline" href={codeLink(code.repo, code.sha, r.file, r.line)} target="_blank" rel="noreferrer">{r.file}:{r.line}</a>
+              : <span className="font-mono text-[12.5px]">{r.file}:{r.line}</span>}</p>
+        ))}
+        {code.commits?.[0] && <p className="mt-1 text-[12.5px] muted">Last change to this code: "{code.commits[0].subject}" ({ago(code.commits[0].ts)}).</p>}
+        <p className="mt-1 text-[11.5px] muted">From your connected GitHub repo. It shows where to look; it doesn't change the diagnosis.</p>
       </Bubble>);
   }
 

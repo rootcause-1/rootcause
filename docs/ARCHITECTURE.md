@@ -73,6 +73,17 @@ histories for slopes, SSE queues, and the replay player's cursor.
    that needs the same single-use approval token. Execute POSTs the incident to the URL (simulated in replay).
 4. `GET /api/company/export` writes the setup back as seed.yaml, so a company keeps it in git.
 
+### Connect your GitHub (17 Oct)
+1. `POST /api/code/scan {url}` shallow-clones a public GitHub repo (`codebase/repo.py`; only https://github.com URLs,
+   no hooks, symlinks off, size cap) and `codebase/scan.py` reads it: compose services, src/ folders, .proto files,
+   CODEOWNERS and flag keys known to the graph (test files ignored, generated files last).
+2. `codebase/store.py` writes Repo/CodeModule/RpcService/Commit and IMPLEMENTS, DECLARES, SERVES, READ_IN, TOUCHED
+   with the `code_*` queries; the scan is cached in data/code_scan.json and written again after every graph reset.
+3. `code_for_node` gives the code behind a node: the incident API adds it as `code`, the chat shows it under the
+   root cause, and autopilot's `read_code` step cites `code:<module>` on the trail (MCP tool `read_code` too).
+4. `code_drift` lists calls seen live that the repo never declares, and declared dependencies never called.
+5. Explanation only: nothing from the code reaches the ranking, so the diagnosis can't be tuned to the answer.
+
 ### M8 Agent and MCP
 1. `tools.py` implements every tool once; the MCP server, autopilot and the LLM agent share it.
 2. The MCP server reads the graph directly and forwards write tools to the API, so side effects happen in one process.

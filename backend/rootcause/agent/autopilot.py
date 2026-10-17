@@ -1,7 +1,7 @@
 """Autopilot: the same investigation as the LLM agent, as a fixed sequence of tool calls (no LLM).
 
 get_incident -> rank_root_causes -> evidence path -> what_changed(root) -> measure_impact ->
-find_similar_incidents -> who_owns(root) -> get_runbook(root) -> propose_action.
+find_similar_incidents -> who_owns(root) -> get_runbook(root) -> read_code(root) -> propose_action.
 Produces the same verdict JSON shape as agent/loop.py and writes the same (:Step) trail. Default for chaos runs
 and replay. Queries: through rootcause/tools.py.
 """
@@ -41,6 +41,7 @@ async def investigate(tools: Tools, trail: Trail, incident_id: str) -> dict[str,
     await call("find_similar_incidents", tools.find_similar_incidents, incident_id=incident_id)
     owner = await call("who_owns", tools.who_owns, node_id=root_node)
     await call("get_runbook", tools.get_runbook, node_id=root_node)
+    await call("read_code", tools.read_code, node_id=root_node)
     proposed = await call("propose_action", tools.propose_action, incident_id=incident_id)
 
     change = (changed.get("changes") or [None])[0]

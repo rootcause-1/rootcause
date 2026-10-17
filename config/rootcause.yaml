@@ -106,6 +106,11 @@ agent:
 verify:
   timeout_seconds: 150                       # alarms clear only after the 60 s error window drains + 3 healthy ticks; recorded runs took 70-95 s
 
+code:                                        # "Connect your GitHub": explanation only, never a ranking input
+  repo: null                                 # scanned on first start if set (env RC_CODE_REPO overrides)
+  allowed_repos:                             # replay mode (public site) only scans these
+    - https://github.com/open-telemetry/opentelemetry-demo
+
 replay:
   loop_pause_seconds: 120                    # after an approved fix: time to look at recovery + report, then restart
   max_broken_loops: 3                        # unattended: restart the scenario after 3 loops of the broken part

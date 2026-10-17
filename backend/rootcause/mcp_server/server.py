@@ -21,7 +21,7 @@ from rootcause.tools import ApiActions, Tools
 INSTRUCTIONS = (
     "RootCause investigates incidents in the OpenTelemetry Demo shop using a FalkorDB graph of services, calls, "
     "queues, alerts, changes, journeys, teams and past incidents. Start with list_incidents, then "
-    "rank_root_causes, trace_evidence_path, what_changed, measure_impact, find_similar_incidents, who_owns. "
+    "rank_root_causes, trace_evidence_path, what_changed, measure_impact, find_similar_incidents, who_owns, read_code. "
     "Every result has an `evidence` list of graph node ids; cite them. Never execute an action without an "
     "approval token issued by a human in the RootCause UI."
 )
@@ -86,6 +86,12 @@ def build(tools: Tools | None = None, host: str = "0.0.0.0", port: int = 8811) -
     async def get_runbook(node_id: str) -> dict[str, Any]:
         """Runbooks for a service."""
         return await t.get_runbook(node_id)
+
+    @mcp.tool()
+    async def read_code(node_id: str) -> dict[str, Any]:
+        """The code behind a service from the connected GitHub repository: folder, language, where it reads
+        feature flags (file:line) and its latest commits."""
+        return await t.read_code(node_id)
 
     @mcp.tool()
     async def cypher_readonly(query: str) -> dict[str, Any]:

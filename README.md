@@ -21,6 +21,15 @@ Many alerts → one incident is a **connected-components** question (`algo.WCC` 
 **betweenness**. "Have we seen this before" is **Jaccard** over shared SignalPatterns. Remove FalkorDB and none of
 these work — the graph is the engine's state, not a cache.
 
+## Connect your GitHub
+Paste a public repository URL in the **Codebase** tab. RootCause makes a shallow clone and reads it (it never runs
+it) into the same graph: which folder `IMPLEMENTS` which service, what it `DECLARES` it depends on (compose
+`depends_on`, `*_ADDR` env vars), gRPC services from `.proto` files, where each feature flag is `READ_IN` (file:line)
+and the latest commits per module. During an incident the chat then shows the code behind the root cause, e.g.
+*"Flag paymentFailure is read at src/payment/charge.js:40"*, and the agent's `read_code` step cites the module.
+`code_drift` compares the declared dependencies with the calls seen live. The code explains; it never changes
+the ranking. The public site scans only the official OpenTelemetry Demo repo (`code.allowed_repos`).
+
 ## Make it yours
 RootCause learns the service graph from telemetry on its own. The **Your company** tab (or `config/seed.yaml`) adds
 what only your company knows, stored as graph edges: `(:Team)-[:OWNS]->(:Service)` and on-call people (who gets
@@ -75,14 +84,17 @@ graph LR
   Incident -- IMPACTED --> Journey
   Incident -- SIMILAR_TO --> Incident
   Incident -- INVESTIGATED_BY --> Step -- CITED --> Service
+  Repo -- CONTAINS --> CodeModule -- IMPLEMENTS --> Service
+  FeatureFlag -- READ_IN --> CodeModule
+  Commit -- TOUCHED --> CodeModule
 ```
 
-| Nodes | Service, Queue, Datastore, Container, Journey, Team, Person, Runbook, FeatureFlag, Change, Alert, Incident, SignalPattern, Hypothesis, Action, Prediction, Step, Report, ChaosRun (+ dynamic `:Anomalous`) |
+| Nodes | Service, Queue, Datastore, Container, Journey, Team, Person, Runbook, FeatureFlag, Change, Alert, Incident, SignalPattern, Hypothesis, Action, Prediction, Step, Report, ChaosRun, Repo, CodeModule, RpcService, Commit (+ dynamic `:Anomalous`) |
 |---|---|
-| **Edges** | CALLS, CALLED_BY, PRODUCES_TO, CONSUMED_BY, USES, RUNS_IN, REQUIRES, OWNS, MEMBER_OF, FOR, REMEDIATES, AFFECTS, CHANGED, FIRED_ON, PART_OF, BLAMES (transient), ROOT_CAUSE, CAUSED_BY, IMPACTED, RESOLVED_BY, HAS_SIGNAL, SIMILAR_TO, HAS_REPORT, HAS_HYPOTHESIS, INVESTIGATED_BY, NEXT, CITED, PREDICTS, PRODUCED |
+| **Edges** | CALLS, CALLED_BY, PRODUCES_TO, CONSUMED_BY, USES, RUNS_IN, REQUIRES, OWNS, MEMBER_OF, FOR, REMEDIATES, AFFECTS, CHANGED, FIRED_ON, PART_OF, BLAMES (transient), ROOT_CAUSE, CAUSED_BY, IMPACTED, RESOLVED_BY, HAS_SIGNAL, SIMILAR_TO, HAS_REPORT, HAS_HYPOTHESIS, INVESTIGATED_BY, NEXT, CITED, PREDICTS, PRODUCED, CONTAINS, IMPLEMENTS, DECLARES, SERVES, READ_IN, TOUCHED |
 
 ## Queries and algorithms we depend on
-All 76 queries are named `.cypher` files in [backend/rootcause/graph/queries/](backend/rootcause/graph/queries/), listed
+All 100 queries are named `.cypher` files in [backend/rootcause/graph/queries/](backend/rootcause/graph/queries/), listed
 with their purpose in [docs/QUERIES.md](docs/QUERIES.md). The core ones:
 
 | Query | Algorithm | Purpose |
@@ -93,6 +105,8 @@ with their purpose in [docs/QUERIES.md](docs/QUERIES.md). The core ones:
 | [evidence_path](backend/rootcause/graph/queries/evidence_path.cypher) | `shortestPath` | the evidence chain |
 | [upstream_bfs](backend/rootcause/graph/queries/upstream_bfs.cypher) | `algo.bfs` | blast radius, prediction |
 | [service_betweenness](backend/rootcause/graph/queries/service_betweenness.cypher) | `algo.betweenness` | restart risk |
+| [code_for_node](backend/rootcause/graph/queries/code_for_node.cypher) | – | the code behind the root cause (module, flag reads, commits) |
+| [code_drift](backend/rootcause/graph/queries/code_drift.cypher) | – | calls seen live vs dependencies the repo declares |
 | [similar_incidents](backend/rootcause/graph/queries/similar_incidents.cypher) | Jaccard over HAS_SIGNAL | incident memory |
 | [recent_changes_for](backend/rootcause/graph/queries/recent_changes_for.cypher) | – | flag changes that AFFECT a node |
 

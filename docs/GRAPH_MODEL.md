@@ -61,6 +61,10 @@ graph LR
 | Step | n, tool, args, summary, ts | agent |
 | Report | markdown, path, ts | report |
 | ChaosRun | flag, variant, truth, class, verdict, top1, top3, ttd_ms, results, seed | chaos runner (eval graph only) |
+| Repo | url, sha, scanned_ts | codebase scan (`codebase/store.py`) |
+| CodeModule | id `code:<name>`, name, path, language, files, loc, owners (CODEOWNERS), kind (code/image) | codebase scan |
+| RpcService | name, methods, file | codebase scan (.proto) |
+| Commit | id = sha, ts, subject (no author names) | codebase scan (`git log` per module) |
 
 Dynamic label: anomalous Service/Queue/Datastore nodes also carry **`:Anomalous`** (set by `create_alert`,
 removed by `resolve_alert` when no firing alert remains).
@@ -86,3 +90,7 @@ removed by `resolve_alert` when no firing alert remains).
 | `(Incident)-[:CAUSED_BY]->(Change)`, `-[:IMPACTED {pct}]->(Journey)`, `-[:RESOLVED_BY]->(Action)`, `-[:HAS_SIGNAL]->(SignalPattern)`, `-[:SIMILAR_TO {score}]->(Incident)`, `-[:HAS_REPORT]->(Report)`, `-[:HAS_HYPOTHESIS]->(Hypothesis)`, `-[:INVESTIGATED_BY]->(Step)` | | |
 | `(Step)-[:NEXT]->(Step)`, `(Step)-[:CITED]->(any)` | | agent trail |
 | `(Prediction)-[:PREDICTS]->(Service \| Queue \| Journey)`, `(ChaosRun)-[:PRODUCED]->(Incident)` | | |
+| `(Repo)-[:CONTAINS]->(CodeModule)`, `(CodeModule)-[:IMPLEMENTS]->(Service \| Datastore)` | | codebase scan; IMPLEMENTS matched by name |
+| `(CodeModule)-[:DECLARES]->(CodeModule)` | via (`depends_on` or the env var) | compose files; compared with CALLS in `code_drift` |
+| `(CodeModule)-[:SERVES]->(RpcService)`, `(Commit)-[:TOUCHED]->(CodeModule)` | | .proto files, git log |
+| `(FeatureFlag)-[:READ_IN]->(CodeModule)` | file, line | where the code reads a flag. Explanation only, never a ranking input |

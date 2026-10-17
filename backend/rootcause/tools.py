@@ -17,6 +17,7 @@ from typing import Any, Protocol
 import httpx
 
 from rootcause import facts
+from rootcause.codebase import store as codebase
 from rootcause.engine import changes, evidence, impact, memory, predict, safety
 from rootcause.graph.client import GraphDB
 from rootcause.util import clean
@@ -147,6 +148,15 @@ class Tools:
     async def get_runbook(self, node_id: str) -> dict[str, Any]:
         rows = await self.db.run("get_runbook", node_id=node_id)
         return {"node": node_id, "runbooks": rows, "evidence": [node_id, *[r["id"] for r in rows]]}
+
+    async def read_code(self, node_id: str) -> dict[str, Any]:
+        """The code behind a node from the scanned GitHub repository: module, language, where it reads feature
+        flags, its latest commits. Explanation only (never a ranking input)."""
+        code = await codebase.for_node(self.db, node_id)
+        if not code:
+            return {"node": node_id, "module": None, "note": "no scanned code module implements this node",
+                    "evidence": [node_id]}
+        return code | {"evidence": [node_id, code["id"]]}
 
     async def cypher_readonly(self, query: str) -> dict[str, Any]:
         if FORBIDDEN.search(query):

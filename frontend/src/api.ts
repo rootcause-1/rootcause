@@ -22,6 +22,24 @@ export type Action = {
   side_effects: { affected_services?: string[]; affected_journeys?: string[]; stateful?: boolean; reason?: string };
 };
 export type Step = { id: string; n: number; tool: string; summary: string; ts: number; cited: string[] };
+export type CodeInfo = {
+  node: string; module: string | null; path?: string | null; language?: string | null; files?: number; loc?: number;
+  reads?: { flag: string; file: string; line: number }[]; commits?: { sha: string; ts: number; subject: string }[];
+  rpc?: string[]; repo?: string | null; sha?: string | null;
+};
+export type CodeModule = {
+  name: string; path: string | null; language: string | null; files: number; loc: number; kind: string;
+  implements: string[]; flags: string[]; declares: string[]; last_commit_ts: number | null;
+};
+export type CodeOverview = {
+  repo: string | null; sha: string | null; scanned_ts: number | null; modules: CodeModule[];
+  drift: { kind: "undeclared" | "unused"; src: string; dst: string }[];
+  scan: { running: boolean; url: string | null; error: string | null; summary: Record<string, unknown> | null };
+  suggested: string | null; allowed: string[] | null;
+};
+export const codeLink = (repo: string, sha: string | null | undefined, file: string, line?: number) =>
+  `${repo.replace(/\.git$/, "")}/blob/${sha || "HEAD"}/${file}${line ? `#L${line}` : ""}`;
+
 export type Incident = {
   id: string; status: string; members: string[]; root_target?: string; confidence?: number;
   created_ts: number; onset_ts: number; resolved_ts?: number; ttr_ms?: number; agent_state?: string;
@@ -32,6 +50,7 @@ export type Incident = {
   steps: Step[]; actions: Action[]; evidence_path: string[];
   similar: { incident: string; score: number; fixes: string[]; root?: string }[];
   verdict?: { root_cause: string; narrative: string; fallback?: string } | null;
+  code?: CodeInfo | null;
 };
 export type Status = {
   mode: string; graph: string; tick: number; tick_ts: number; learning_left_ms: number; agent_mode: string;
@@ -83,6 +102,8 @@ export const api = {
     j("/api/chaos/run", { method: "POST", body: JSON.stringify(body) }),
   scenarios: () => j<string[]>("/api/replay/scenarios"),
   company: () => j<Company>("/api/company"),
+  code: () => j<CodeOverview>("/api/code"),
+  scanCode: (url: string) => j("/api/code/scan", { method: "POST", body: JSON.stringify({ url }) }),
   saveCompany: (kind: "team" | "journey" | "runbook", item: unknown) =>
     j("/api/company", { method: "PUT", body: JSON.stringify({ kind, item }) }),
   deleteCompany: (id: string) => j(`/api/company/${encodeURIComponent(id)}`, { method: "DELETE" }),

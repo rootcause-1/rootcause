@@ -82,6 +82,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 | Company map | Customers → services in their team's lane (with who's on call) → shared infrastructure; live traffic dots. | live |
 | Chat narrator | WhatsApp-style chat driven by real incident state; "Yes, fix it"; demo autoplay in replay only. | live |
 | Tabs | Break something, Predict, Memory, Reports, **Your company**. | live (company: new) |
+| Connect your GitHub | Codebase tab: shallow clone + read of a public repo → CodeModule/IMPLEMENTS/DECLARES/READ_IN/TOUCHED in the graph; chat shows the code behind the root cause (file:line link); agent `read_code` step; code-vs-traffic drift. | new, unit + graph tests, checked end to end on the real API |
 | Your company | Teams, on-call, ownership, journeys, runbooks + automation URLs, edited in the graph (ingestion reads journey routes from the graph); export seed.yaml. | new |
 
 ## 3. Is FalkorDB used properly? Yes. The details:
@@ -90,7 +91,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 reasons over it there: the alerting subgraph (`:Anomalous`), blame edges, incidents, hypotheses, actions, the agent's
 steps, memory and chaos runs. Turn FalkorDB off and nothing can group, rank, explain or remember.
 
-**Graph algorithms doing real work** (all in named `.cypher` files, 89 queries in docs/QUERIES.md):
+**Graph algorithms doing real work** (all in named `.cypher` files, 100 queries in docs/QUERIES.md):
 | Question | Algorithm | Query |
 | --- | --- | --- |
 | Which alarms belong together? | `algo.WCC` | group_incidents |
@@ -107,7 +108,7 @@ steps, memory and chaos runs. Turn FalkorDB off and nothing can group, rank, exp
 1. The UI's "pages sent" list reads `data/pager_inbox.jsonl`, not the graph (the graph does have the `Action`).
    Small; could read `Action {kind:'page'}` instead.
 2. FalkorDB features we don't use yet: full-text and vector indexes, more algorithms (k shortest paths, community
-   detection). The GitHub connector (§5) would use the full-text index.
+   detection). A full-text index over code files would be the next step for the GitHub connector.
 3. The compose files pin `falkordb/falkordb:v4.22.1`; today's local check ran on module 4.18.3. Yash's Docker
    run covers 4.22.1.
 
@@ -118,21 +119,7 @@ steps, memory and chaos runs. Turn FalkorDB off and nothing can group, rank, exp
 
 ## 5. What could come next
 
-1. **Connect your GitHub (codebase map).** A company pastes its repository URL. RootCause reads the code
-   (never runs it) and adds it to the same graph:
-   - `(:CodeModule)-[:IMPLEMENTS]->(:Service)` from the compose/k8s build contexts and folder names;
-   - `(:Service)-[:DECLARES]->(:Service|:Datastore)` from compose `depends_on` and `*_ADDR` env vars, so the map
-     exists before any traffic, and "declared but never called / called but undeclared" drift is a query;
-   - `(:RpcService)` from `.proto` files, matched to the `rpc.method` peers we already see;
-   - `(:FeatureFlag)-[:READ_IN {file, line}]->(:CodeModule)`: where in the code each flag is read;
-   - `(:Commit)-[:TOUCHED]->(:CodeModule)` and `CODEOWNERS` → `(:Team)-[:OWNS]`.
-
-   During an incident the chat can then point at the code, for example "payment is failing; flag `paymentFailure`
-   is read in `src/payment/charge.js:NN`; last commit to it was 3 days ago by …". It stays explanation only: it
-   never feeds the ranking, so nothing can be tuned to the answer.
-   Tried by hand on the official demo repo: its compose file lists the buildable services and their declared dependencies (e.g. checkout →
-   cart, currency, email, payment, product-catalog), 10 gRPC services in `pb/demo.proto`, and flag reads in
-   `src/payment/charge.js`, `src/cart/.../CartService.cs` and `src/product-catalog/flags`.
+1. ~~Connect your GitHub~~: built 17 Oct (see the feature table and ARCHITECTURE.md).
 2. Deploys as changes: a deploy webhook (or new container image) → `Change {kind:'deploy'}` linked to the service.
 3. Approve from Slack: the page message carries Approve/Reject buttons that hit the same token endpoint.
 4. Pager history from the graph (weak spot 1).

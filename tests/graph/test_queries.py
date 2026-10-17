@@ -34,6 +34,8 @@ COMMON = {
     "variant": "on", "truth": "payment", "class": "errors", "seed": 1, "verdict": "payment", "top1": True,
     "top3": True, "ttd_ms": 1000, "incident_id": "INC-0001", "results": "{}", "miss_reason": None, "run": "R1",
     "stale_before": NOW, "exclude": [], "keep": ["journey:checkout"],
+    "modules": [], "declares": [], "rpc": [], "reads": [], "commits": [],
+    "url": "https://github.com/a/b", "sha": "abc",
 }
 ROWS = {
     "upsert_services": [{"id": "x", "rps": 1.0, "err_rate": 0.0, "self_err_rate": 0.0, "p95_ms": 1.0,
@@ -256,3 +258,39 @@ async def test_company_setup_edits_reach_ownership_and_proposals(db):
     teams = {t["id"]: t for t in (await company.get(db, frozenset()))["teams"]}
     assert "payment" in teams["payments-team"]["owns"]
     assert not await db.run("runbook_automations", node_id="payment")
+
+
+async def test_codebase_in_the_graph_explains_the_root(db):
+    from rootcause.codebase import store
+
+    await fixtures.build(db)
+    data = {
+        "url": "https://github.com/acme/shop", "sha": "abc123",
+        "modules": [{"name": n, "path": f"src/{n}", "language": "Go", "files": 3, "loc": 100, "owners": [],
+                     "kind": "code"} for n in ("frontend", "checkout", "payment", "cart")]
+                   + [{"name": "valkey-cart", "path": None, "language": None, "files": 0, "loc": 0, "owners": [],
+                       "kind": "image"}],
+        "declares": [{"src": "frontend", "dst": "checkout", "via": "depends_on"},
+                     {"src": "checkout", "dst": "cart", "via": "CART_ADDR"},
+                     {"src": "checkout", "dst": "valkey-cart", "via": "depends_on"}],
+        "rpc": [{"id": "rpc:PaymentService", "name": "PaymentService", "methods": ["Charge"],
+                 "file": "pb/demo.proto", "module": "payment"}],
+        "flag_reads": [{"flag": "paymentFailure", "module": "payment", "file": "src/payment/charge.js", "line": 40},
+                       {"flag": "noSuchFlag", "module": "payment", "file": "src/payment/x.js", "line": 1}],
+        "commits": [{"module": "payment", "sha": "c1", "ts": 1, "subject": "old"},
+                    {"module": "payment", "sha": "c2", "ts": 2, "subject": "new"}],
+    }
+    await store.write(db, data)
+    code = await store.for_node(db, "edge:checkout->payment")
+    assert code["module"] == "payment" and code["rpc"] == ["PaymentService"]
+    assert code["reads"] == [{"flag": "paymentFailure", "file": "src/payment/charge.js", "line": 40}]
+    assert [c["subject"] for c in code["commits"]] == ["new", "old"]
+    assert await store.for_node(db, "accounting") is None
+    ov = await store.overview(db, frozenset())
+    assert ov["repo"] == "https://github.com/acme/shop" and len(ov["modules"]) == 5
+    drift = {(d["kind"], d["src"], d["dst"]) for d in ov["drift"]}
+    assert ("undeclared", "checkout", "payment") in drift      # called in traffic, never declared
+    assert ("undeclared", "frontend", "cart") in drift
+    assert ("unused", "checkout", "valkey-cart") not in drift  # checkout -> cart -> cache, but not declared target
+    await store.write(db, data)  # rescans replace, never duplicate
+    assert len((await store.overview(db, frozenset()))["modules"]) == 5

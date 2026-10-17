@@ -51,6 +51,11 @@ first (known miss). Three changes are in, **none verified against FalkorDB yet**
 Update (later on 17 Oct): steps 1 and 2 below already pass on real FalkorDB 4.18.3 (run without Docker via
 falkordblite in WSL; numbers in PROGRESS.md). Re-run them on Docker (v4.22.1) anyway, then do 3 to 5.
 
+Also new (17 Oct evening): **Connect your GitHub**. The Codebase tab scans a public repo into the graph and
+the chat shows the code behind the root cause. The API image now installs `git` (Dockerfile.api) and the replay
+compose sets `RC_CODE_REPO` to the OpenTelemetry Demo repo, so the public site scans it on first start (~20 s).
+For live mode set `code.repo` in config/rootcause.yaml or scan from the tab.
+
 Please run, in order, and paste the outputs into `docs/PROGRESS.md`:
 1. `make lint test`: graph tests include `test_company_setup_edits_reach_ownership_and_proposals` and the
    `blame_targets` assertion. Fix anything FalkorDB-specific the small way.

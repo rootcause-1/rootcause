@@ -10,12 +10,13 @@ import Narrator, { Intro, STAGE_LABEL, STAGES, targetStage, useNarration } from 
 import ServiceMap from "./components/ServiceMap";
 import { C } from "./palette";
 import ChaosLab, { type ChaosRun } from "./tabs/ChaosLab";
+import Codebase from "./tabs/Codebase";
 import CompanySetup from "./tabs/Company";
 import Memory from "./tabs/Memory";
 import Predict from "./tabs/Predict";
 import Reports from "./tabs/Reports";
 
-const TOOLS = ["Break something", "Predict", "Memory", "Reports", "Your company"] as const;
+const TOOLS = ["Break something", "Predict", "Memory", "Reports", "Codebase", "Your company"] as const;
 type Tool = (typeof TOOLS)[number];
 const HISTORY = 72; // ticks kept for the timeline (6 min)
 
@@ -188,6 +189,7 @@ export default function App() {
           {tool === "Predict" && <Predict graph={graph} onOverlay={setPredicted} />}
           {tool === "Memory" && <Memory />}
           {tool === "Reports" && <Reports />}
+          {tool === "Codebase" && <Codebase />}
           {tool === "Your company" && <CompanySetup replay={replay} />}
         </aside>
       )}

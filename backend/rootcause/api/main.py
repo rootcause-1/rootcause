@@ -3,7 +3,7 @@
 Startup: connect to FalkorDB, create indexes, seed the graph if it has no teams, build the Runtime, then start the
 tick loop plus live sources (live mode) or the replay player (replay mode).
 Queries used directly: graph_nodes/graph_edges (via runtime), list_reports, memory_incidents, get_prediction
-(company setup queries via company.py).
+(company setup queries via company.py, codebase queries via codebase/store.py).
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ from rootcause import company, facts
 from rootcause.actions import pager
 from rootcause.actions.flagd import read_config
 from rootcause.chaos.runner import ChaosRunner, load_catalogue
+from rootcause.codebase import repo as code_repo
+from rootcause.codebase import store as codebase
 from rootcause.engine import predict
 from rootcause.graph.client import get_graph
 from rootcause.graph.schema import ensure_indexes, load_seed
@@ -43,6 +45,7 @@ class State:
     chaos: ChaosRunner
     recorder: Recorder
     player_task: asyncio.Task[Any] | None = None
+    code: dict[str, Any] = {"running": False, "url": None, "error": None, "summary": None}
 
 
 S = State()
@@ -56,6 +59,7 @@ async def _start_replay(name: str) -> dict[str, Any]:
     await S.rt.db.delete()  # a fresh rc_replay graph per scenario
     await ensure_indexes(S.rt.db)
     await load_seed(S.rt.db)
+    await codebase.restore(S.rt.db, get_settings().rc_data_dir)
     S.rt.detector.started_ms = None
     S.rt.started.clear()
     S.rt.pipeline.reset()  # fresh span window + flag state for the new graph
@@ -82,6 +86,7 @@ async def _replay_loop(name: str) -> None:
         await S.rt.db.delete()
         await ensure_indexes(S.rt.db)
         await load_seed(S.rt.db)
+        await codebase.restore(S.rt.db, get_settings().rc_data_dir)
         S.rt.detector.started_ms = None
         S.rt.started.clear()
         S.rt.pipeline.reset()
@@ -98,6 +103,9 @@ async def lifespan(app: FastAPI):
     S.recorder = Recorder(s.rc_replay_dir)
     S.rt = Runtime(s, db, recorder=S.recorder if s.rc_mode == "live" else None)
     await _refresh_journeys()  # journey routes edited in company setup live in the graph
+    if not await codebase.restore(db, s.rc_data_dir) and _code_repo_default():
+        S.code.update(running=True, url=_code_repo_default())
+        asyncio.ensure_future(_scan_code(_code_repo_default()))  # first start: scan the configured repo
     S.chaos = ChaosRunner(S.rt)
     S.rt.tasks.append(asyncio.ensure_future(S.rt.run_ticks()))
     if s.rc_mode == "live":
@@ -160,6 +168,7 @@ async def incident(incident_id: str) -> dict[str, Any]:
     root = inc.get("root_target")
     inc["evidence_path"] = (await S.rt.tools.incident_evidence_path(incident_id))["path"] if root else []
     inc["similar"] = (await S.rt.tools.find_similar_incidents(incident_id))["similar"]
+    inc["code"] = await codebase.for_node(S.rt.db, root) if root else None
     return inc
 
 
@@ -332,12 +341,65 @@ async def admin_reset(request: Request) -> dict[str, Any]:
     await S.rt.db.delete()
     await ensure_indexes(S.rt.db)
     await load_seed(S.rt.db)
+    await codebase.restore(S.rt.db, get_settings().rc_data_dir)
     S.rt.detector.started_ms = None
     S.rt.started.clear()
     S.rt.pipeline.reset()
     if s.flagd_path:  # first observation of the flags = healthy baseline variants
         await S.rt.pipeline.feed({"type": "flag_config", "ts": now_ms(), "data": read_config(s.flagd_path)})
     return {"reset": True, "graph": S.rt.db.name}
+
+
+# --------------------------------------------------------------------------- codebase (GitHub)
+def _code_repo_default() -> str | None:
+    return os.environ.get("RC_CODE_REPO") or get_settings().c("code", "repo")
+
+
+async def _scan_code(url: str) -> None:
+    S.code.update(running=True, url=url, error=None)
+    try:
+        S.code["summary"] = await codebase.scan_repo(
+            S.rt.db, url, get_settings().rc_data_dir, list(get_settings().seed.get("flag_service_map") or {}))
+        log.info("scanned %s: %s", url, S.code["summary"])
+    except Exception as exc:
+        S.code["error"] = str(exc)
+        log.warning("code scan of %s failed: %s", url, exc)
+    finally:
+        S.code["running"] = False
+
+
+class ScanReq(BaseModel):
+    url: str
+
+
+@app.get("/api/code")
+async def code_get() -> dict[str, Any]:
+    """The scanned repository as the graph holds it: modules, what they implement and declare, drift."""
+    return await codebase.overview(S.rt.db, get_settings().non_candidates) | {
+        "scan": S.code, "suggested": _code_repo_default(),
+        "allowed": get_settings().c("code", "allowed_repos", default=[]) if get_settings().rc_mode == "replay" else None}
+
+
+@app.post("/api/code/scan")
+async def code_scan(body: ScanReq) -> dict[str, Any]:
+    """Clone (shallow) and scan a public GitHub repository in the background. Nothing in it is executed."""
+    try:
+        code_repo.parse_url(body.url)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    allowed = get_settings().c("code", "allowed_repos", default=[])
+    if get_settings().rc_mode == "replay" and body.url.rstrip("/") not in [a.rstrip("/") for a in allowed]:
+        raise HTTPException(403, "the public replay site only scans: " + ", ".join(allowed))
+    if S.code["running"]:
+        raise HTTPException(409, "a scan is already running")
+    S.code.update(running=True, url=body.url.strip(), error=None)
+    asyncio.ensure_future(_scan_code(body.url.strip()))
+    return {"started": True, "url": body.url}
+
+
+@app.get("/api/code/{node_id}")
+async def code_for(node_id: str) -> dict[str, Any]:
+    return await codebase.for_node(S.rt.db, node_id) or {"node": node_id, "module": None}
 
 
 # --------------------------------------------------------------------------- company setup

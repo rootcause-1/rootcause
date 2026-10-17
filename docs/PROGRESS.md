@@ -227,3 +227,16 @@ pytest tests/graph  -> 104 passed in 19.81s
 pytest tests/scenarios -> 6 passed in 212.40s
 ```
 Still open: live check of productCatalogLockContention on the demo and its recording (Yash, HANDOFF §2.0).
+
+## 17 Oct (evening): Connect your GitHub
+Same local FalkorDB 4.18.3 (falkordblite in WSL):
+```
+ruff: All checks passed!
+pytest tests/unit      -> 79 passed
+pytest tests/graph     -> 117 passed
+pytest tests/scenarios -> 6 passed in 474.07s
+```
+End to end on the real API (replay mode, paymentFailure): startup scan of open-telemetry/opentelemetry-demo found
+37 modules (20 with code, 26,514 lines), 83 declared dependencies, 11 gRPC services, 20 flag reads. The chat showed
+"Flag paymentFailure is read at src/payment/charge.js:40"; the autopilot trail cites `code:payment`; the scan came
+back after `POST /api/admin/reset`. URL guards: non-GitHub URL → 400, other repo on the replay site → 403.
