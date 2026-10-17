@@ -1,4 +1,5 @@
-"""Watch recovery after an action: success when every alert in the incident is resolved within 90 s.
+"""Watch recovery after an action: success when every alert in the incident is resolved within
+verify.timeout_seconds (150 s).
 
 (Alerts only resolve after 3 healthy ticks, so "all resolved" already means "healthy for 3 ticks".)
 Success -> Action.status='verified', resolve_incident (status, ttr_ms, RESOLVED_BY), memory, report.

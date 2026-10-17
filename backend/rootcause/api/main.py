@@ -97,6 +97,7 @@ async def lifespan(app: FastAPI):
         log.info("seeding %s: %s", db.name, await load_seed(db))
     S.recorder = Recorder(s.rc_replay_dir)
     S.rt = Runtime(s, db, recorder=S.recorder if s.rc_mode == "live" else None)
+    await _refresh_journeys()  # journey routes edited in company setup live in the graph
     S.chaos = ChaosRunner(S.rt)
     S.rt.tasks.append(asyncio.ensure_future(S.rt.run_ticks()))
     if s.rc_mode == "live":

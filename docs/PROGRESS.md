@@ -216,3 +216,14 @@ no incident is a miss for every method. Scorecards are generated (never typed); 
 | 1 `20261015_194536` | after the flag sweep | **80 % / 87 %** (median 54 s) | graph_off 73 %, first_alert 47 %, loudest 33 % | 2 of 3 misses were a harness race: a noise alert opened an incident seconds before the flip and the fault's alerts joined it. Fixed: ≥ 2 failed requests per error alert, latency floor 100 ms, runner scores the incident the fault joined. |
 | 2 `20261015_205332` | + those fixes | aborted after 5 runs | – | regression found: the new latency guards hid emailMemoryLeak's latency, the 2-min memory hold exceeded the 180 s window, and the fast EWMA had absorbed earlier undetected leaks into the baseline. Fixed: memory hold 60 s on top of the 2-min slope, EWMA α 0.01 after learning, sample gate only on the service-wide p95. |
 | 3 `20261015_213046` | final | **87 % / 93 %** (median 53 s) | graph_off 80 %, loudest/first/highest-error 40 % | misses: kafkaQueueProblems (the DB flood formed its own incident) and productCatalogLockContention (DB ranked #1, truth #2). `docs/SCORECARD.md`. |
+
+## 17 Oct: ranking rule, company setup, automations (local FalkorDB, no Docker)
+FalkorDB module 4.18.3 run from `falkordblite` inside WSL (port 6390), tests pointed at it with
+`FALKORDB_TEST_HOST=127.0.0.1 FALKORDB_TEST_PORT=6390`:
+```
+ruff: All checks passed!
+pytest tests/unit   -> 77 passed
+pytest tests/graph  -> 104 passed in 19.81s
+pytest tests/scenarios -> 6 passed in 212.40s
+```
+Still open: live check of productCatalogLockContention on the demo and its recording (Yash, HANDOFF §2.0).

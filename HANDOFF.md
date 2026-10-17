@@ -48,6 +48,9 @@ first (known miss). Three changes are in, **none verified against FalkorDB yet**
   "Run automation" for the root service (ordered after flag reverts, before restarts), with the usual approval token;
   execute POSTs the incident JSON to that URL. In replay it is simulated.
 
+Update (later on 17 Oct): steps 1 and 2 below already pass on real FalkorDB 4.18.3 (run without Docker via
+falkordblite in WSL; numbers in PROGRESS.md). Re-run them on Docker (v4.22.1) anyway, then do 3 to 5.
+
 Please run, in order, and paste the outputs into `docs/PROGRESS.md`:
 1. `make lint test`: graph tests include `test_company_setup_edits_reach_ownership_and_proposals` and the
    `blame_targets` assertion. Fix anything FalkorDB-specific the small way.
