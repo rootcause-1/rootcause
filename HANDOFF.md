@@ -21,7 +21,7 @@ Read this, then `docs/FEATURES.md` (every feature with its status) and `CLAUDE.m
 | Public demo | **http://3.234.90.242/** now opens on the lock-contention story ("alarms on 5 services, 2 teams, 1 cause"); redeploys itself from `main` | `docs/DEPLOY.md` |
 | Connect your GitHub | works live and on the public site (scans the demo repo on start: 37 modules, 26.5k lines, flag reads with file:line) | `docs/PROGRESS.md`, README |
 | UI | Shambhvi's company map (customers → team lanes → shared infra) + WhatsApp-style chat narrator, **Start demo** runs the whole story by itself | `frontend/src/components/` |
-| Blind chaos scorecard | batch of 15 **running now** on Yash's laptop (restarted 13:05 after the Gemini switch, ~3 h, now includes the `llm_no_graph` Gemini baseline); last finished batch (16 Oct): 87 % top-1 / 93 % top-3 | `docs/SCORECARD.md`, `docs/scorecards/` |
+| Blind chaos scorecard | batch 4 (18 Oct, 15 runs): RootCause 80 % top-1, Gemini without the graph 80 % (different misses: only RootCause found the broken connection), loudest alert 53 %; batch 3 (16 Oct): 87 % / 93 % | `docs/SCORECARD.md`, `docs/scorecards/` |
 | LLM agent (Gemini, `RC_AGENT_MODE=llm`) | **works live**: Gemini picked 8 MCP tools, verdict payment 0.9, wrote the narrative and report summary | `docs/PROGRESS.md` (18 Oct, LLM agent) |
 | Fix it in code (Gemini writes a fix, opens a PR) | **works live**: opened https://github.com/yash4428/opentelemetry-demo/pull/1 (one-line guard in `src/payment/charge.js`) | `docs/PROGRESS.md` (18 Oct, LLM agent) |
 | Keys | `GEMINI_API_KEY` + `GITHUB_TOKEN` only in Yash's local `.env` (gitignored). **The public site stays keyless on purpose**: anonymous visitors would spend Gemini credit and open PRs | §2.4 |
@@ -39,7 +39,7 @@ forms its own incident; the UI is built for laptop/desktop, not phones; the page
   `.venv/Scripts/python video/make_video.py` → `video/out/rootcause-demo.mp4`. It records the **public site**
   ("Start demo") and narrates from `video/script.json`. The demo lines were updated today to the
   lock-contention story the site now plays. **Before running, update `proof_1`** in `video/script.json` with the
-  new scorecard numbers (§2.2) if they change; until then it says 87 % / 53 s / 40 % (batch 3, still true).
+  new scorecard numbers (§2.2) if they change; updated 18 Oct to batch 4.
 - **Option B, by hand**: open http://3.234.90.242/, click **Start demo**, screen-record at 1080p, narrate with
   `docs/DEMO_SCRIPT.md`.
 - Upload (YouTube unlisted is fine), then replace `_TODO: add YouTube link_` in `README.md`.

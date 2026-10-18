@@ -30,7 +30,7 @@
       {"id": "demo_recovered", "stage": "recovered", "text": "Recovered, verified, and the incident report is written. Errors are back to zero."}
     ]},
     {"scene": "proof", "lines": [
-      {"id": "proof_1", "text": "We tested it blind. Fifteen random faults on the real demo. RootCause named the right service first eighty seven percent of the time, in a median of fifty three seconds. The usual alarm rules managed forty percent."}
+      {"id": "proof_1", "text": "We tested it blind. Fifteen random faults on the real demo. RootCause named the right service first eighty percent of the time, in a median of fifty seconds. Blaming the loudest alarm managed fifty three. Gemini, given only a table of the same alarms, also got eighty, but it missed the broken connection that only the graph could see."}
     ]},
     {"scene": "close", "lines": [
       {"id": "close_1", "text": "Why a graph? Because what broke is a question about connections. Connected components turn alarms into one incident. PageRank finds the cause. Breadth first search shows what a fix will touch. And shared signal patterns help it remember."},

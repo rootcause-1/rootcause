@@ -545,7 +545,8 @@ Before M10, break **every** catalogue flag once by hand, write what you observe 
 automations, Connect your GitHub, Fix it in code) verified on Docker FalkorDB v4.22.1 (205 tests, 7/7 golden
 replays) and live; lock contention is now top-1 product-catalog and is the public demo. LLM switched to Gemini;
 with keys in the local `.env` the Gemini agent and Fix it in code ran live (PR yash4428/opentelemetry-demo#1);
-the public site stays keyless. The notes below are the 16 Oct state, kept for history.
+the public site stays keyless. Blind batch 4 (18 Oct): RootCause 80 % top-1, Gemini without the graph 80 % (different
+misses), loudest alert 53 %. The notes below are the 16 Oct state, kept for history.
 
 ### 16 Oct state (history)
 

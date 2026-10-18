@@ -131,27 +131,36 @@ Full table, per-class breakdown and every miss: [docs/SCORECARD.md](docs/SCORECA
 
 | method | top-1 | top-3 | median time to verdict | runs scored |
 |---|---|---|---|---|
-| rootcause | 87% | 93% | 53 s | 15 |
-| graph_off | 80% | 87% | - | 15 |
-| llm_no_graph | - | - | - | 0 |
-| loudest_alert | 40% | 80% | - | 15 |
-| first_alert | 40% | 80% | - | 15 |
-| highest_error | 40% | 87% | - | 15 |
+| rootcause | 80% | 80% | 50 s | 15 |
+| graph_off | 73% | 80% | - | 15 |
+| llm_no_graph | 80% | 87% | - | 15 |
+| loudest_alert | 53% | 73% | - | 15 |
+| first_alert | 60% | 73% | - | 15 |
+| highest_error | 53% | 80% | - | 15 |
 
 ## RootCause top-1 by fault class
 
 | class | top-1 | runs |
 |---|---|---|
 | ai | 100% | 1 |
-| errors | 100% | 6 |
-| invisible | 67% | 3 |
-| latency | 80% | 5 |
+| errors | 86% | 7 |
+| invisible | 67% | 6 |
+| latency | 100% | 1 |
 
 ## Misses
 
-- `kafkaQueueProblems` (truth `fraud-detection | checkout`): verdict `db:astronomy-db` — truth not among candidates (top-1 was db:astronomy-db)
-- `productCatalogLockContention` (truth `product-catalog`): verdict `db:astronomy-db` — truth ranked 2 (top-1 was db:astronomy-db)
+- `recommendationCacheFailure` (truth `recommendation`): verdict `frontend` — truth not among candidates (top-1 was frontend)
+- `adFailure` (truth `ad`): verdict `agent` — truth not among candidates (top-1 was agent)
+- `kafkaConsumerDead` (truth `fraud-detection`): verdict `astronomy-db` — truth not among candidates (top-1 was astronomy-db)
 <!-- scorecard:end -->
+
+Reading it (from the per-run results in the `rc_eval_20261018_073532` graph): RootCause and Gemini given only a flat
+table of the same alerts both named the cause first in 12 of 15 runs, but not the same 12. Only RootCause found the
+broken connection in `paymentUnreachable` (`edge:checkout->payment`; Gemini blamed checkout). Gemini found one
+`recommendationCacheFailure` where recommendation raised no alert of its own. All three RootCause misses are faults
+whose true service never alerted. RootCause's answer also carries the evidence path, the change, the risk of each fix
+and a verified recovery. The previous batch (16 Oct, no Gemini baseline): 87 % top-1 / 93 % top-3, median 53 s
+([docs/scorecards/batch3_20261015_213046.md](docs/scorecards/batch3_20261015_213046.md)).
 
 ## Use it from Claude Desktop (MCP)
 With `make up` running, add to `claude_desktop_config.json`:
