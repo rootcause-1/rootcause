@@ -40,3 +40,4 @@ Format: `date · module · what Claude Code did · what a human verified`. Human
 2026-10-18 · actions/service.py (code_fix) · Claude Code: fix PR body uses the verdict's evidence path (diagnosis time) instead of the live graph, which has already recovered when the PR opens after a revert; test covers it · human: _to fill_
 2026-10-18 · docs (PROGRESS, HANDOFF, FEATURES, CLAUDE.md §16) · Claude Code: recorded the live Gemini agent run and the real fix PR (yash4428/opentelemetry-demo#1), key status, restarted chaos batch · human: _to fill_
 2026-10-18 · docs/DEMO_SCRIPT.md · Claude Code: final real-run video script (live shop → Gemini agent → approval → verified recovery → GitHub PR → human merge), honesty notes, setup; field-guide artifact with real screenshots · human: _to fill_
+2026-10-18 · graph/queries/set_root_cause.cypher · Claude Code: ROOT_CAUSE only links Service/Queue/Datastore (a Container with the same id got a second edge); graph test · human: _to fill_

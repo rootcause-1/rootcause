@@ -220,6 +220,16 @@ async def test_propose_reverts_change_on_a_runner_up_suspect(db):
     assert "suspect #2" in reverts[0]["reason"]
 
 
+async def test_root_cause_skips_a_container_with_the_same_id(db):
+    await fixtures.build(db)
+    await db.raw("CREATE (:Container {id: 'checkout'})")
+    await db.run("create_incident", id="INC-0010", now=NOW, onset=ONSET, members=FAILING)
+    await db.run("set_root_cause", id="INC-0010", node="checkout", edge=None, score=0.8, target="checkout")
+    rows = await db.raw("MATCH (:Incident {id: 'INC-0010'})-[:ROOT_CAUSE]->(n) RETURN labels(n) AS labels",
+                        read_only=True)
+    assert len(rows) == 1 and "Service" in rows[0]["labels"]
+
+
 async def test_ui_snapshot_journeys_and_teams(db):
     await fixtures.build(db)
     journeys = {r["id"]: r for r in await db.run("graph_journeys")}
