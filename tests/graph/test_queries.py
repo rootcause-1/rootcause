@@ -332,6 +332,10 @@ async def test_fix_it_in_code_opens_a_pull_request_end_to_end(db, monkeypatch):
     [code_fix] = [a for a in proposals if a["kind"] == "code_fix"]
     assert code_fix["risk"] == "low" and code_fix["params"]["files"] == ["src/payment/charge.js"]
     assert proposals[0]["kind"] == "flag_revert"  # the fix that stops the bleeding still comes first
+    # the PR can open after the revert healed the graph: the body keeps the path from diagnosis time
+    await db.run("set_incident_props", id=inc["id"], props={"verdict": _json.dumps(
+        {"root_cause": "payment", "evidence_path": ["frontend-proxy", "frontend", "checkout", "payment"]})})
+    await db.raw("MATCH ()-[b:BLAMES]->() DELETE b")
     token = (await svc.approve(code_fix["id"]))["approval_token"]
     assert (await svc.execute(code_fix["id"], token))["status"] == "executing"
     for t in list(svc.tasks):
@@ -339,6 +343,7 @@ async def test_fix_it_in_code_opens_a_pull_request_end_to_end(db, monkeypatch):
     action = (await db.run("get_action", id=code_fix["id"]))[0]["action"]
     assert action["status"] == "executed" and action["pr_url"] == "https://github.com/acme/shop/pull/7"
     assert "retryLater" in fake.pushed["src/payment/charge.js"]
+    assert "frontend-proxy → frontend → checkout → payment" in fake.pr_body
     rows = await db.raw("MATCH (p:PullRequest)-[:FIXES]->(i:Incident), (p)-[:CHANGES]->(m:CodeModule) "
                         "RETURN p.number AS n, i.id AS inc, m.id AS module", read_only=True)
     assert rows == [{"n": 7, "inc": inc["id"], "module": "code:payment"}]

@@ -282,7 +282,10 @@ class ActionService:
             if last and last[0]["ts"] and now_ms() - int(last[0]["ts"]) < cooldown_ms:
                 raise RuntimeError("a fix pull request was opened a few minutes ago; try again later")
             inc = await facts.full(self.db, a["incident_id"])
-            inc["evidence_path"] = await evidence.path(self.db, inc.get("members") or [], inc.get("root_target") or "")
+            # like the report: the verdict's path (diagnosis time) wins over the live graph, which may have recovered
+            verdict = inc.get("verdict") if isinstance(inc.get("verdict"), dict) else {}
+            inc["evidence_path"] = verdict.get("evidence_path") or await evidence.path(
+                self.db, inc.get("members") or [], inc.get("root_target") or "")
             pr = await code_fix.open_fix_pr(self.db, self.s, inc, self.writer or _llm_writer(self.s))
         except Exception as exc:
             log.warning("fix PR for %s failed: %s", a["incident_id"], exc)

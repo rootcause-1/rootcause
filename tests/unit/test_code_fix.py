@@ -67,6 +67,7 @@ class FakeGitHub:
         self.calls: list[tuple[str, str]] = []
         self.files = {"src/payment/charge.js": FILE}
         self.pushed: dict[str, str] = {}
+        self.pr_body = ""
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         path = req.url.path.removeprefix("/repos/acme/shop")
@@ -88,6 +89,7 @@ class FakeGitHub:
             return httpx.Response(200, json={})
         if req.method == "POST" and path == "/pulls":
             assert json.loads(req.content)["base"] == "main"
+            self.pr_body = json.loads(req.content)["body"]
             return httpx.Response(201, json={"html_url": "https://github.com/acme/shop/pull/7", "number": 7})
         return httpx.Response(404, json={"message": "Not Found"})
 
