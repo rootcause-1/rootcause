@@ -17,7 +17,7 @@ FOOT, VOICE, OUT, MG = HERE / "footage3", HERE / "voice2", HERE / "out2", HERE /
 OUT.mkdir(exist_ok=True)
 W, H, FPS = 1920, 1080, 30
 FX, FY, FW, FH = 76, 84, 1768, 996          # footage window on the stage (= the capture size, pasted 1:1)
-LEAD, TAIL, XFADE = 0.25, 0.35, 8
+LEAD, TAIL, XFADE = 0.18, 0.30, 8
 
 F_SANS = "/System/Library/Fonts/SFNS.ttf"
 F_MONO = "/System/Library/Fonts/Menlo.ttc"

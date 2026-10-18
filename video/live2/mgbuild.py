@@ -1,7 +1,7 @@
 """Beats for the motion-graphics scenes, from the voice timing (so each animation step lands on its sentence)."""
 import json, subprocess, sys
 from pathlib import Path
-LEAD, TAIL = 0.25, 0.35
+LEAD, TAIL = 0.18, 0.30
 T = json.loads(Path("voice2/timing.json").read_text())
 def st(seg):
     s = [LEAD + x for x in T[seg]["starts"]]; d = [b - a for a, b in zip(s, s[1:] + [LEAD + T[seg]["dur"]])]

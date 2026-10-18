@@ -58,7 +58,7 @@ def build():
         {"key": "pr", "kind": "live", "chapter": "Live demo · fix it in code", "clips": [
             {"cast": "rc", "t0": E("pr_offer") - 1, "t1": E("pr_offer") + 5, "caption": "Fix it in code?"},
             {"at": 1, "cast": "rc", "t0": E("approve_pr") - 1.5, "t1": E("approve_pr") + 2.0, "caption": "Yes, open a pull request"},
-            {"at": 2, "cast": "rc", "t0": E("pr_open") - 4, "t1": E("pr_open") + 5, "caption": "Gemini writes the change"}]},
+            {"frac": 0.62, "cast": "rc", "t0": E("pr_open") - 4, "t1": E("pr_open") + 5, "caption": "Gemini writes the change"}]},
         {"key": "github_pr", "kind": "live", "chapter": "Live demo · the pull request", "clips": [
             {"cast": "github", "t0": g.ts[0] + 1.0, "t1": E("gh_files") - 0.5, "caption": "A real pull request on GitHub",
              "sub": "root cause · evidence path · change · impact"},
