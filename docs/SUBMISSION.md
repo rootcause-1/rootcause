@@ -7,7 +7,12 @@ Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB). Every field is read
 **Tagline:** An AI on-call engineer that sees your system as a graph, finds the one real cause behind a storm of
 alarms, fixes it with your OK, and opens the code fix as a pull request.
 
-**Track:** Track 01: Agents That Act on Connected Data
+**Tracks:** Track 01: Agents That Act on Connected Data, and Track 03: Company Brain
+
+**Why Track 03.** RootCause also understands how the company around the system works: which team owns each service
+and who is on call, who owns each part of the code, the runbooks, and the customer journeys. It traces every decision
+back to its source (incident → the change that caused it → the flag; pull request → the incident it fixes → the code
+it changes), and keeps all of it current in one FalkorDB graph that updates every 5 seconds.
 
 **Links**
 - Source code: https://github.com/rootcause-1/rootcause

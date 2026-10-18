@@ -7,7 +7,7 @@ It's 3 AM. Four alarms go off: the website gateway, the storefront, checkout and
 Every alarm is real. But only one service is actually broken, and the other three are failing because they depend on
 it. Working out which one, by hand, under pressure, is the slowest part of every outage.
 
-We built **RootCause** for Graph Hacks (WeMakeDevs × FalkorDB, Track 01: Agents That Act on Connected Data). It
+We built **RootCause** for Graph Hacks (WeMakeDevs × FalkorDB; Track 01: Agents That Act on Connected Data, and Track 03: Company Brain). It
 watches a real shop, turns everything it sees into a FalkorDB graph, and lets an AI agent find the cause, prove it,
 fix it with a person's approval, and open the code fix as a pull request.
 

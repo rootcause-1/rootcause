@@ -5,7 +5,7 @@ Gemini agent and Fix it in code run for real with keys.
 Read this, then `docs/FEATURES.md` (every feature with its status) and `CLAUDE.md` §0 (rules).
 
 **Deadlines today:** feature freeze **2:00 PM IST** · submission **11:59 PM IST**
-(Graph Hacks, FalkorDB, Track 01: *Agents That Act on Connected Data*).
+(Graph Hacks, FalkorDB, Track 01: *Agents That Act on Connected Data* and Track 03: *Company Brain*).
 **After 2 PM: no new features.** Only the video, docs, the scorecard sync and bug fixes.
 
 ---
@@ -69,7 +69,7 @@ request; nothing breaks. Revoke the GitHub token after judging.
 README "Use it from Claude Desktop" snippet → ask "Who owns payment?" → paste the answer under M8 in PROGRESS.
 
 ### 2.6 Submit (before 11:59 PM IST) — Owner: Yash
-Repo https://github.com/rootcause-1/rootcause · live URL http://3.234.90.242/ · video link · Track 01.
+Repo https://github.com/rootcause-1/rootcause · live URL http://3.234.90.242/ · video link · Tracks 01 and 03.
 
 ### 2.7 After judging — Owner: Yash
 Terminate the AWS instance and release the Elastic IP (`docs/DEPLOY.md`), ~$12/month otherwise.
