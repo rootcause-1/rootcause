@@ -1,5 +1,8 @@
 # Demo video script (≤ 3 min)
 
+> The published video (https://youtu.be/tws31rPbplE, 4:39) is the v3 cut (4:12 with the draft voice, 4:39 with our own); its narration, timed to
+> each shot, is [VOICEOVER.md](VOICEOVER.md). This file is how the run was planned and filmed.
+
 ## Final version (18 Oct): the real run, ending with a real pull request
 
 **Recorded:** the cut in `video/out/rootcause-demo-draft.mp4` was made from a live run with the narration in

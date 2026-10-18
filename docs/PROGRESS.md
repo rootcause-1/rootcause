@@ -1,6 +1,10 @@
 # Progress
 
-Code for every milestone is written. **No acceptance check has been run yet**: the dev machine had no Docker, so
+**Current status (18 Oct 2026):** acceptance checks M0–M11 pass against the real OpenTelemetry Demo (M8: MCP verified
+with an MCP client and the Gemini agent; the Claude Desktop check is not ticked). The table below is current; the
+sections after it are the evidence, in date order. The next two paragraphs are the starting point on 15 Oct.
+
+*15 Oct, morning:* code for every milestone is written. No acceptance check has been run yet: the dev machine had no Docker, so
 FalkorDB, the OpenTelemetry Demo and the graph tests could not start. A box is ticked only after its check passes
 and the output is pasted below it.
 
@@ -23,7 +27,7 @@ These are NOT acceptance checks — the boxes below still need the real demo.
 | M6 | Actions, verify, report | done | [x] approve revert → incident resolved + report |
 | M7 | UI v1 | done | [x] M5–M6 flow visible and clickable |
 | M8 | MCP, autopilot, LLM agent, Step trail | done | [~] Claude Desktop answers "who owns payment?"; agent JSON produced; trail visible |
-| M9 | Extras: memory, predict, safety, invisible + AI faults | done | [x] PRD acceptance lines (PRD not in repo yet) |
+| M9 | Extras: memory, predict, safety, invisible + AI faults | done | [x] PRD acceptance lines ([PRD.md](PRD.md)) |
 | M10 | Chaos runner, baselines, scorecard, recorder, golden tests | done | [x] `make chaos N=15` writes SCORECARD.md; `make scenario-test` green |
 | M11 | Replay deployment, docs, README | done | [x] fresh VM: one command → public URL in REPLAY |
 
