@@ -41,7 +41,7 @@ The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If 
 | Backend | Python 3.12, FastAPI, uvicorn, asyncio, `httpx`, `pydantic` v2, `pyyaml` |
 | Graph | FalkorDB (`falkordb/falkordb:v4.22.1`, pinned), Python client `falkordb` (use `falkordb.asyncio` in async code) |
 | MCP | Official Python MCP SDK (`mcp`), `FastMCP`, transports: stdio and streamable HTTP |
-| LLM | Anthropic Python SDK, model from env `RC_LLM_MODEL` (default `claude-sonnet-5-5`), temperature 0 |
+| LLM | Google Gemini over its REST API (`backend/rootcause/llm.py`, httpx, no SDK), model `RC_LLM_MODEL` (default `gemini-2.5-flash`), temperature 0. Switched from Claude on 18 Oct at the team's request. |
 | Containers | Docker SDK for Python (`docker`) via mounted `/var/run/docker.sock` |
 | UI | React 18 + Vite + TypeScript, plain SVG company map (isometric boxes) + popup narrator (Three.js scene removed 16 Oct at Shambhvi's request), Tailwind (warm paper theme, Newsreader + Inter + JetBrains Mono), SSE (`EventSource`) |
 | Tests | `pytest`, `pytest-asyncio`, `ruff`; FalkorDB test container for integration tests |
@@ -148,8 +148,8 @@ RC_WINDOW_SECONDS=60
 PROMETHEUS_URL=http://prometheus:9090     # VERIFY service name/port inside demo network
 DEMO_REPO_PATH=../opentelemetry-demo
 FLAGD_CONFIG_PATH=${DEMO_REPO_PATH}/src/flagd/demo.flagd.json   # VERIFY
-ANTHROPIC_API_KEY=
-RC_LLM_MODEL=claude-sonnet-5-5
+GEMINI_API_KEY=
+RC_LLM_MODEL=gemini-2.5-flash
 RC_AGENT_MODE=autopilot          # autopilot | llm
 PAGER_WEBHOOK_URL=               # optional (Discord/Slack incoming webhook)
 ```
@@ -551,7 +551,7 @@ replays) and live; lock contention is now top-1 product-catalog and is the publi
 **State:** running against the real OpenTelemetry Demo (agentic mode, `LOCUST_USERS=12`) on Yash's Mac.
 - `make lint test` → 157 passed; `make scenario-test` → 6/6 golden replays (top-1 = truth, change linked).
 - Acceptance M0–M7 and M9–M11 pass live; M8 verified with an MCP client (HTTP + stdio) — the Claude Desktop check and
-  the LLM agent mode (needs `ANTHROPIC_API_KEY`) are the only open items. Evidence: `docs/PROGRESS.md`.
+  the LLM agent mode (needs `GEMINI_API_KEY`) are the only open items. Evidence: `docs/PROGRESS.md`.
 - Every catalogue flag was broken by hand: 15/16 top-1 after general fixes (lock contention ranks the DB first,
   truth #2). Observations are comments in `chaos/catalogue.yaml`.
 - Recordings: 6 scenarios in `replay/` (~4 MB each). Public replay site: http://3.234.90.242/ (AWS, `docs/DEPLOY.md`);
@@ -572,7 +572,7 @@ diagnosis frozen while verifying; reports render the verdict snapshot; recording
 **Do next** (feature freeze 18 Oct 2 PM IST):
 1. When the chaos batch finishes: put its numbers into README "Scorecard" (copy from docs/SCORECARD.md, never type).
 2. Record the video with `docs/DEMO_SCRIPT.md`; add the video link to README.
-3. Optional: `ANTHROPIC_API_KEY` in `.env` → `RC_AGENT_MODE=llm` demo + the `llm_no_graph` baseline (re-run chaos).
+3. Optional: `GEMINI_API_KEY` in `.env` → `RC_AGENT_MODE=llm` demo + the `llm_no_graph` baseline (re-run chaos).
 4. After judging: terminate the AWS instance (commands in docs/DEPLOY.md).
 
 **Gotchas from running it:** keep the Mac awake and plugged in (sleep pauses the Docker VM and corrupts runs);

@@ -136,7 +136,7 @@ class Runtime:
         trail = Trail(self.db, incident_id, self.sse.publish)
         started = time.monotonic()
         try:
-            if self.agent_mode == "llm" and self.s.anthropic_api_key:
+            if self.agent_mode == "llm" and self.s.gemini_api_key:
                 verdict = await llm_loop.investigate(self.s, trail, incident_id)
             else:
                 verdict = await autopilot.investigate(self.tools, trail, incident_id)

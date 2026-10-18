@@ -129,9 +129,8 @@ histories for slopes, SSE queues, and the replay player's cursor.
    while an approved fix is being verified, and the report renders the agent's verdict snapshot.
 
 ## Deliberate deviations from CLAUDE.md (flagged for the team)
-- **LLM temperature**: the spec asks for temperature 0, but `claude-sonnet-5-5` rejects non-default sampling
-  parameters (HTTP 400). The agent pins `output_config.effort = "medium"` instead and enables server-side refusal
-  fallbacks (`fallbacks: "default"`).
+- **LLM provider**: Gemini (`backend/rootcause/llm.py`, REST, temperature 0) instead of Claude, switched on 18 Oct at the
+  team's request; MCP tool schemas are translated to Gemini function declarations.
 - **Journey ids** are `journey:<name>` so they never collide with service ids (`checkout` is both).
 - **Edge-cause threshold**: "callee has zero server spans" is checked as "callee rps ≤ 10% of its baseline", because the
   60 s window still holds old spans for up to a minute after a callee disappears.

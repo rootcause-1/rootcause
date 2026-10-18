@@ -17,7 +17,7 @@ services:
       RC_AGENT_MODE: autopilot
       RC_REPLAY_SCENARIO: ${RC_REPLAY_SCENARIO:-productCatalogLockContention}   # 12 alarms, 3 teams, 1 cause
       RC_CODE_REPO: ${RC_CODE_REPO:-https://github.com/open-telemetry/opentelemetry-demo}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}               # fix PRs, only on RC_PR_REPO (our fork)
       RC_PR_REPO: ${RC_PR_REPO:-}
     restart: unless-stopped

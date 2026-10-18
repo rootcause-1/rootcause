@@ -314,7 +314,7 @@ async def test_fix_it_in_code_opens_a_pull_request_end_to_end(db, monkeypatch):
     [inc] = [x for x in await IncidentEngine(db, get_settings()).run(NOW) if x.get("created")]
     assert inc["root"] == "payment"
 
-    s = get_settings().model_copy(update={"anthropic_api_key": "k", "github_token": "t"})
+    s = get_settings().model_copy(update={"gemini_api_key": "k", "github_token": "t"})
     s.cfg = {**s.cfg, "code": {**(s.cfg.get("code") or {}), "pr_repo": "acme/shop", "pr_cooldown_minutes": 10}}
     fake = FakeGitHub()
     monkeypatch.setattr(fix, "GitHub", lambda token, repo: fake_gh(fake))

@@ -38,7 +38,7 @@ applies it only if every edit matches exactly once, and opens a **GitHub pull re
 The PR description carries the evidence path, the change and the customer impact from the graph, and the PR is
 recorded as `(:PullRequest)-[:FIXES]->(:Incident)`. It needs a human approval like every action, opens at most one
 PR per 10 minutes, never merges, and says plainly that RootCause did not run the changed code. Needs
-`ANTHROPIC_API_KEY`, `GITHUB_TOKEN` (fine-grained, the fork only) and `RC_PR_REPO`.
+`GEMINI_API_KEY`, `GITHUB_TOKEN` (fine-grained, the fork only) and `RC_PR_REPO`.
 
 ## Make it yours
 RootCause learns the service graph from telemetry on its own. The **Your company** tab (or `config/seed.yaml`) adds
@@ -49,7 +49,7 @@ approval). Export the setup back to seed.yaml with one click.
 
 ## Quick start — live mode (needs Docker, ~8 GB RAM)
 ```bash
-cp .env.example .env            # add ANTHROPIC_API_KEY to use the LLM agent (optional)
+cp .env.example .env            # add GEMINI_API_KEY to use the LLM agent (optional)
 make demo-up                    # clones the OpenTelemetry Demo to ../opentelemetry-demo, installs our collector override,
                                 # sets LOCUST_USERS=12 in its .env.override, starts agentic mode
 make up                         # FalkorDB (:6380, browser :3300), API (:8000, OTLP :4318), MCP (:8811), UI (:8088)

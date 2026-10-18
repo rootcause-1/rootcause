@@ -364,13 +364,13 @@ export default function Narrator({ stage, typing, status, inc, graph, demo, auto
             <p>✅ <b>Pull request #{codeFix.pr_number} is open:</b>{" "}
               <a className="text-[#027EB5] underline" href={codeFix.pr_url} target="_blank" rel="noreferrer">{codeFix.pr_title}</a></p>
             {codeFix.pr_explanation && <p className="mt-1 text-[13.5px]">{codeFix.pr_explanation}</p>}
-            <p className="mt-1 text-[11.5px] muted">Written by Claude from the incident facts, with the evidence path and impact in the PR description.
+            <p className="mt-1 text-[11.5px] muted">Written by Gemini from the incident facts, with the evidence path and impact in the PR description.
               I didn't run the changed code: your CI and a reviewer decide.</p>
           </Bubble>);
         else if (codeFix.status === "failed") msgs.push(
           <Bubble key="pr-fail" time={Date.now()}>I couldn't open the pull request: {codeFix.error ?? "unknown error"}</Bubble>);
         else msgs.push(
-          <Bubble key="pr-wait" time={Date.now()}>✍️ Reading the code, writing the change with Claude and opening the pull request… <span className="typing-dots" aria-hidden><i /><i /><i /></span></Bubble>);
+          <Bubble key="pr-wait" time={Date.now()}>✍️ Reading the code, writing the change with Gemini and opening the pull request… <span className="typing-dots" aria-hidden><i /><i /><i /></span></Bubble>);
       }
     }
   }

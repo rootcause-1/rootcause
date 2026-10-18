@@ -68,16 +68,11 @@ async def _call_automation(a: dict[str, Any]) -> dict[str, Any]:
     return {"automation": a["target"], "status_code": r.status_code}
 
 
-def _claude_writer(s: Settings) -> code_fix.Writer:
-    from rootcause.agent.loop import _client, _create
-
-    client = _client(s)
+def _llm_writer(s: Settings) -> code_fix.Writer:
+    from rootcause import llm
 
     async def write(system: str, user: str) -> str:
-        resp = await _create(client, s, system=system, messages=[{"role": "user", "content": user}])
-        if resp.stop_reason == "refusal":
-            raise RuntimeError("Claude declined to write this fix")
-        return "".join(b.text for b in resp.content if b.type == "text")
+        return await llm.ask(s, user, system=system)
 
     return write
 
@@ -91,7 +86,7 @@ class ActionService:
         self.on_simulated = on_simulated  # replay player hook
         self.narrator = narrator
         self.tasks: set[asyncio.Task[Any]] = set()
-        self.writer: code_fix.Writer | None = None  # tests inject a fake; default is Claude
+        self.writer: code_fix.Writer | None = None  # tests inject a fake; default is Gemini (rootcause.llm)
 
     @property
     def simulated(self) -> bool:
@@ -241,7 +236,7 @@ class ActionService:
             return {"error": "approval token expired"}
         await self.db.run("set_action_props", id=action_id, props={"approval_used": True, "status": "executing"})
         a = facts._action(raw)
-        if a["kind"] == "code_fix":  # Claude + GitHub take a while: answer now, finish in the background
+        if a["kind"] == "code_fix":  # Gemini + GitHub take a while: answer now, finish in the background
             self._spawn(self._code_fix(a))
             await self._emit("action", {"id": action_id, "status": "executing"})
             return {"action": action_id, "status": "executing", "evidence": [a["incident_id"], a["target"]]}
@@ -288,7 +283,7 @@ class ActionService:
                 raise RuntimeError("a fix pull request was opened a few minutes ago; try again later")
             inc = await facts.full(self.db, a["incident_id"])
             inc["evidence_path"] = await evidence.path(self.db, inc.get("members") or [], inc.get("root_target") or "")
-            pr = await code_fix.open_fix_pr(self.db, self.s, inc, self.writer or _claude_writer(self.s))
+            pr = await code_fix.open_fix_pr(self.db, self.s, inc, self.writer or _llm_writer(self.s))
         except Exception as exc:
             log.warning("fix PR for %s failed: %s", a["incident_id"], exc)
             await self.db.run("set_action_props", id=a["id"], props={"status": "failed", "error": str(exc)[:300]})

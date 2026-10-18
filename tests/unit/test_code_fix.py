@@ -36,14 +36,14 @@ def test_pick_files_prefers_the_flag_that_changed():
 
 def test_enabled_lists_what_is_missing():
     class S:
-        anthropic_api_key, github_token = "", ""
+        gemini_api_key, github_token = "", ""
 
         def c(self, *a, **k):
             return None
 
     s = S()
-    assert "ANTHROPIC_API_KEY" in fix.enabled(s)
-    s.anthropic_api_key = "k"
+    assert "GEMINI_API_KEY" in fix.enabled(s)
+    s.gemini_api_key = "k"
     assert "GITHUB_TOKEN" in fix.enabled(s)
     s.github_token = "t"
     assert "pr_repo" in fix.enabled(s)

@@ -1,9 +1,9 @@
-"""Fix it in code: Claude writes a fix for the incident's root cause and RootCause opens it as a GitHub pull request.
+"""Fix it in code: Gemini writes a fix for the incident's root cause and RootCause opens it as a GitHub pull request.
 
 1. Pick the files: where the root-cause module reads the flag that changed before the incident (READ_IN edges,
    from code_for_node); otherwise the module's first flag read.
-2. Fetch those files from the fork on GitHub, give Claude the incident facts + the files (prompts.FIXER).
-3. Apply Claude's find/replace edits only if every `find` matches exactly once (`apply_edits`, pure, tested).
+2. Fetch those files from the fork on GitHub, give Gemini the incident facts + the files (prompts.FIXER).
+3. Apply Gemini's find/replace edits only if every `find` matches exactly once (`apply_edits`, pure, tested).
 4. Open a pull request on `code.pr_repo` from branch rootcause/<incident>; record (:PullRequest)-[:FIXES]->(:Incident)
    and -[:CHANGES]->(:CodeModule).
 Nothing is merged or deployed: a person reviews the PR. RootCause does not run the changed code; the fork's CI does.
@@ -34,8 +34,8 @@ def pr_repo(s: Settings) -> str | None:
 
 def enabled(s: Settings) -> str | None:
     """None when fix PRs can be opened, else the reason they can't (shown in the UI)."""
-    if not s.anthropic_api_key:
-        return "needs ANTHROPIC_API_KEY (Claude writes the fix)"
+    if not s.gemini_api_key:
+        return "needs GEMINI_API_KEY (Gemini writes the fix)"
     if not s.github_token:
         return "needs GITHUB_TOKEN (to open the pull request)"
     if not pr_repo(s):
@@ -96,7 +96,7 @@ def pr_body(inc: dict[str, Any], code: dict[str, Any], plan: dict[str, Any], fil
         "### Not done by RootCause",
         "- The changed code was not run or tested by RootCause; your CI checks it.",
         "- Nothing is merged or deployed until a person approves this pull request.",
-        "", "_Change written by Claude from the incident facts above._",
+        "", "_Change written by Gemini from the incident facts above._",
     ])
 
 

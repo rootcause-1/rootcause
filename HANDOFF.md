@@ -21,7 +21,7 @@ Read this, then `docs/FEATURES.md` (every feature with its status) and `CLAUDE.m
 | Connect your GitHub | works live and on the public site (scans the demo repo on start: 37 modules, 26.5k lines, flag reads with file:line) | `docs/PROGRESS.md`, README |
 | UI | Shambhvi's company map (customers → team lanes → shared infra) + WhatsApp-style chat narrator, **Start demo** runs the whole story by itself | `frontend/src/components/` |
 | Blind chaos scorecard | batch of 15 **running now** on Yash's laptop (started 12:45, ~3 h); last finished batch (16 Oct): 87 % top-1 / 93 % top-3 | `docs/SCORECARD.md`, `docs/scorecards/` |
-| Fix it in code (Claude writes a fix, opens a PR) | built and tested with fakes; **not run for real** (needs a fork + keys, see §2.4) | `docs/FEATURES.md` |
+| Fix it in code (Gemini writes a fix, opens a PR) | built and tested with fakes; **not run for real** (needs a fork + keys, see §2.4) | `docs/FEATURES.md` |
 
 Remaining honest weak spots (fine to mention in the video or README): `kafkaQueueProblems` floods the database, which
 forms its own incident; the UI is built for laptop/desktop, not phones; the pager list reads a file, not the graph.
@@ -53,7 +53,7 @@ Never type the numbers by hand. If the batch fails, the 16 Oct numbers already i
 ### 2.4 Optional: Fix it in code, for real — Owner: whoever has the keys. Skip if short on time.
 1. Fork https://github.com/open-telemetry/opentelemetry-demo into `rootcause-1`.
 2. Fine-grained GitHub token for **that fork only** (Contents + Pull requests read/write).
-3. On the AWS host `.env` (Yash, SSH): `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `RC_PR_REPO=rootcause-1/opentelemetry-demo`,
+3. On the AWS host `.env` (Yash, SSH): `GEMINI_API_KEY`, `GITHUB_TOKEN`, `RC_PR_REPO=rootcause-1/opentelemetry-demo`,
    `RC_CODE_REPO=https://github.com/rootcause-1/opentelemetry-demo`, then `scripts/deploy_aws.sh`.
 Without keys the chat simply does not offer the pull request; nothing breaks.
 
@@ -93,7 +93,7 @@ backend/rootcause/
   engine/   core (BLAMES → WCC → ranking) · ranking (**passive_targets: unchanged DB = symptom**) · edge_cause · changes
             impact · evidence · predict · safety · memory
   actions/  service (propose/approve/execute, **runbook automations**, **fix PR**) · flagd · containers · pager · verify · report
-  **codebase/** scan (repo → CodeModule/IMPLEMENTS/DECLARES/READ_IN) · store · repo · github · fix (Claude writes the patch)
+  **codebase/** scan (repo → CodeModule/IMPLEMENTS/DECLARES/READ_IN) · store · repo · github · fix (Gemini writes the patch)
   **company.py** teams / on-call / journeys / runbooks edited in the graph (Your company tab)
   agent/    autopilot (default, now with a read_code step) · loop (LLM over MCP) · trail
   mcp_server/ server (16 tools) · chaos/ runner · baselines · scorecard · catalogue.yaml · replay/ recorder · player

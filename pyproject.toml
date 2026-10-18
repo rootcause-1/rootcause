@@ -12,7 +12,6 @@ dependencies = [
   "pyyaml>=6",
   "falkordb>=1.0.10",
   "mcp>=1.9,<2",
-  "anthropic>=0.40",
   "docker>=7",
   "opentelemetry-proto>=1.24",
 ]

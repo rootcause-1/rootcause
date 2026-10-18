@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     prometheus_url: str | None = None
     demo_repo_path: str = "../opentelemetry-demo"
     flagd_config_path: str | None = None
-    anthropic_api_key: str = ""
-    rc_llm_model: str = "claude-sonnet-5-5"
+    gemini_api_key: str = ""
+    rc_llm_model: str = "gemini-2.5-flash"
     rc_agent_mode: str = "autopilot"  # autopilot | llm
     pager_webhook_url: str = ""
     github_token: str = ""  # fix-it-in-code PRs on code.pr_repo only

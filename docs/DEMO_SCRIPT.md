@@ -23,7 +23,7 @@ site (same code path, recorded telemetry). Screen: 1920×1080, UI at `localhost:
 ## Version 2: "give it your GitHub" (17 Oct, the flow the team wants)
 
 Needs: our fork of the demo shop (e.g. `rootcause-1/opentelemetry-demo`), `GITHUB_TOKEN` (fine-grained, that fork
-only, Contents + Pull requests read/write), `ANTHROPIC_API_KEY`, `RC_PR_REPO=<owner/fork>` in `.env`.
+only, Contents + Pull requests read/write), `GEMINI_API_KEY`, `RC_PR_REPO=<owner/fork>` in `.env`.
 
 | Time | Screen | Say |
 |---|---|---|

@@ -290,3 +290,17 @@ def test_company_to_seed_round_trips_the_seed_shape():
     assert seed["teams"][0]["owns"] == ["a", "b"]
     assert seed["runbooks"] == [{"id": "rb", "service": "a", "title": "Fix a", "steps": ["s"], "remediates": []}]
     assert seed_params(seed)["teams"][0]["owns"] == ["a", "b"]
+
+
+def test_gemini_schema_translates_mcp_tool_schemas():
+    from rootcause.llm import gemini_schema
+
+    mcp = {"type": "object", "title": "x", "additionalProperties": False, "required": ["incident_id"],
+           "properties": {"incident_id": {"type": "string", "title": "Incident Id"},
+                          "status": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None},
+                          "ids": {"type": "array", "items": {"type": "string"}}}}
+    out = gemini_schema(mcp)
+    assert out == {"type": "OBJECT", "required": ["incident_id"], "properties": {
+        "incident_id": {"type": "STRING"}, "status": {"type": "STRING", "nullable": True},
+        "ids": {"type": "ARRAY", "items": {"type": "STRING"}}}}
+    assert gemini_schema({"type": "object", "properties": {}}) == {"type": "OBJECT"}

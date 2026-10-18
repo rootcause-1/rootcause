@@ -54,9 +54,11 @@ def graph_off(hypotheses: list[dict[str, Any]], weights: dict[str, float]) -> li
 
 
 async def llm_no_graph(s: Settings, alerts: list[dict[str, Any]], nodes: list[dict[str, Any]]) -> list[str] | None:
-    if not s.anthropic_api_key:
+    from rootcause import llm
+    from rootcause.agent.loop import parse_verdict
+
+    if not llm.enabled(s):
         return None
-    from rootcause.agent.loop import _client, _create, parse_verdict
 
     table = {"alerts": [{k: a.get(k) for k in ("target", "kind", "ts", "value")} for a in alerts],
              "services": [{k: n.get(k) for k in ("id", "rps", "err_rate", "p95_ms", "cpu_pct", "mem_mb")}
@@ -64,9 +66,7 @@ async def llm_no_graph(s: Settings, alerts: list[dict[str, Any]], nodes: list[di
     prompt = ("These alerts fired together in a microservice shop. Which single node is the root cause? "
               "Reply only with JSON: {\"ranked\": [\"<node id>\", \"<2nd>\", \"<3rd>\"]}\n" + json.dumps(table))
     try:
-        resp = await _create(_client(s), s, messages=[{"role": "user", "content": prompt}])
-        text = "".join(b.text for b in resp.content if b.type == "text")
-        out = parse_verdict(text) or {}
+        out = parse_verdict(await llm.ask(s, prompt)) or {}
         return [str(x) for x in out.get("ranked", [])]
     except Exception as exc:
         log.warning("llm_no_graph baseline failed: %s", exc)
