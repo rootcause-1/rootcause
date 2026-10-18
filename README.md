@@ -7,6 +7,21 @@ approval, verifies recovery, writes the report and remembers the incident.
 **Track:** Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB) — *Agents That Act on Connected Data*
 **Demo video:** _TODO: add YouTube link_ · **Live (replay) deployment:** http://3.234.90.242/ (AWS, replay mode — see [docs/DEPLOY.md](docs/DEPLOY.md))
 
+## Start here (judges, 5 minutes)
+- **Watch** the demo video (link above): 4 minutes, one real run on the official OpenTelemetry Demo, from a bad
+  config change to a pull request merged by a person.
+- **Try** http://3.234.90.242/ and click **Start demo**: a replay of a real run that tells the story by itself.
+- **Read** [How it works](#how-it-works) (one diagram, nine steps) and [Why a graph](#why-a-graph).
+
+| Track 01 focus | Where RootCause does it |
+|---|---|
+| Multi-hop reasoning | The evidence path walks `BLAMES` edges from the website gateway to the cause (`shortestPath`, up to 8 hops); impact walks `Journey -REQUIRES-> Service`; the code layer joins `CodeModule -IMPLEMENTS-> Service -CALLS-> Service`. |
+| Graph queries and algorithms as agent tools | 16 MCP tools, each backed by named Cypher queries: `algo.WCC` (one incident), `algo.pageRank` (where blame flows), `shortestPath` (proof), `algo.bfs` (blast radius), `algo.betweenness` (restart risk), plus a guarded read-only Cypher tool. |
+| Tool selection through MCP | The Gemini agent chooses which tools to call on our MCP server; every call is stored as a `(:Step)` that `CITED` the nodes it used. Any MCP client (e.g. Claude Desktop) can use the same tools. |
+| Actions based on what the graph shows | Revert the flag that `AFFECTS` the root; judge a restart by blast radius and centrality; page the team that `OWNS` it; open a pull request on the file where the root reads the flag (`READ_IN`). Every action needs a person's approval. |
+| Explainable results | Evidence path on the map, the reasoning in plain words, cited node ids, a report written from the graph, and a blind scorecard with every miss listed. |
+| Remember, connect people and decisions | Incident memory (`SignalPattern` overlap → the fix that worked), teams, on-call people, runbooks, approved actions and pull requests, all in the same graph. |
+
 Architecture diagram and how each part works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Picking this up? Start with [HANDOFF.md](HANDOFF.md).
 
 ![RootCause on the public replay of productCatalogLockContention: alarms across two teams collapse to one root cause (product-catalog), the chat shows the code behind it, who is hurt, and asks to apply the low-risk fix](docs/img/ui-incident.jpg)
