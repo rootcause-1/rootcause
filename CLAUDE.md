@@ -538,7 +538,15 @@ Before M10, break **every** catalogue flag once by hand, write what you observe 
 
 ---
 
-## 16. Current state and how to continue (updated 16 Oct, ~2 AM IST)
+## 16. Current state and how to continue (updated 18 Oct, ~1 PM IST — submission day)
+
+**Read `HANDOFF.md` first** (status, owners, what is left today) and `docs/FEATURES.md` (every feature + status).
+18 Oct: Shambhvi's 17 Oct work (company map + chat UI, database-is-a-symptom rule, company setup, runbook
+automations, Connect your GitHub, Fix it in code) verified on Docker FalkorDB v4.22.1 (205 tests, 7/7 golden
+replays) and live; lock contention is now top-1 product-catalog and is the public demo. The notes below are the
+16 Oct state, kept for history.
+
+### 16 Oct state (history)
 
 **State:** running against the real OpenTelemetry Demo (agentic mode, `LOCUST_USERS=12`) on Yash's Mac.
 - `make lint test` → 157 passed; `make scenario-test` → 6/6 golden replays (top-1 = truth, change linked).

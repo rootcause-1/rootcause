@@ -3,7 +3,7 @@
   "rate": 1.05,
   "scenes": [
     {"scene": "cold", "lines": [
-      {"id": "cold_1", "text": "It's two forty in the morning. Four alarms just went off, across two teams."},
+      {"id": "cold_1", "text": "It's two forty in the morning. Alarms just went off on five services, across two teams."},
       {"id": "cold_2", "text": "Only one of them is the real problem. Which one?"}
     ]},
     {"scene": "problem", "lines": [
@@ -21,10 +21,10 @@
     ]},
     {"scene": "demo", "lines": [
       {"id": "demo_healthy", "stage": "healthy", "text": "Here's a real run, replayed from the OpenTelemetry Demo shop. Customers on the left, every service grouped by the team that owns it. The moving dots are real requests."},
-      {"id": "demo_alerts", "stage": "alerts", "text": "A fault hits. Four alarms across two teams. RootCause messages the on-call engineer, like a colleague on WhatsApp."},
+      {"id": "demo_alerts", "stage": "alerts", "text": "A fault hits. Alarms on five services, across two teams. RootCause messages the on-call engineer, like a colleague on WhatsApp."},
       {"id": "demo_investigating", "stage": "investigating", "text": "It knows the alarms are one problem, and its agent walks the graph, step by step."},
-      {"id": "demo_root", "stage": "root", "text": "Root cause: Payments. The failures start there, nothing it depends on is failing, the blame flows to it, and a feature flag changed just before."},
-      {"id": "demo_impact", "stage": "impact", "text": "It also shows who is hurt: customers trying to check out."},
+      {"id": "demo_root", "stage": "root", "text": "Root cause: the product catalog. Its own requests fail first, the blame flows to it, and a feature flag changed just before. The database looks slow too, but nothing changed there, so RootCause calls it a symptom."},
+      {"id": "demo_impact", "stage": "impact", "text": "It also shows who is hurt: customers browsing and viewing products."},
       {"id": "demo_fix", "stage": "fix", "text": "Should I fix this? It proposes the lowest risk fix, switching that flag back, and says exactly what it touches."},
       {"id": "demo_fixing", "stage": "fixing", "text": "One yes, and it applies the fix and watches every alarm clear."},
       {"id": "demo_recovered", "stage": "recovered", "text": "Recovered, verified, and the incident report is written. Errors are back to zero."}
