@@ -5,10 +5,10 @@ finds the one real cause behind a storm of symptom alerts, proves it with an evi
 approval, verifies recovery, writes the report and remembers the incident.
 
 **Track:** Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB) — *Agents That Act on Connected Data*
-**Demo video:** _TODO: add YouTube link_ · **Live (replay) deployment:** http://3.234.90.242/ (AWS, replay mode — see [docs/DEPLOY.md](docs/DEPLOY.md))
+**Demo video:** https://youtu.be/tws31rPbplE · **Live (replay) deployment:** http://3.234.90.242/ (AWS, replay mode — see [docs/DEPLOY.md](docs/DEPLOY.md))
 
 ## Start here (judges, 5 minutes)
-- **Watch** the demo video (link above): 4 minutes, one real run on the official OpenTelemetry Demo, from a bad
+- **Watch** the [demo video](https://youtu.be/tws31rPbplE): under 5 minutes, one real run on the official OpenTelemetry Demo, from a bad
   config change to a pull request merged by a person.
 - **Try** http://3.234.90.242/ and click **Start demo**: a replay of a real run that tells the story by itself.
 - **Read** [How it works](#how-it-works) (one diagram, nine steps) and [Why a graph](#why-a-graph).

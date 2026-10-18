@@ -33,7 +33,7 @@ forms its own incident; the UI is built for laptop/desktop, not phones; the page
 
 ## 2. What is left today, in order, with an owner
 
-### 2.1 Video (≤ 3 min) — the one thing judges need most. Owner: Yash
+### 2.1 Video — done: https://youtu.be/tws31rPbplE (4:39, Yash's voice; file `video/out/rootcause-demo-final.mp4`). Owner: Yash
 **A full 2:31 cut of a real live run exists**: `video/out/rootcause-demo-draft.mp4` on Yash's Mac (gitignored; macOS
 voice). To use your own voice: `video/live/README.md` (record 11 lines, `python3 voice.py --mine DIR`, re-render).
 Then upload (YouTube unlisted) and replace `_TODO: add YouTube link_` in `README.md`. The older options below remain

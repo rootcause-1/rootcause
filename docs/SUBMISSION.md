@@ -1,6 +1,6 @@
 # Submission text (copy-paste)
 
-Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB). Fill the video link marked TODO before submitting.
+Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB). Every field is ready to paste.
 
 **Project name:** RootCause
 
@@ -12,7 +12,7 @@ alarms, fixes it with your OK, and opens the code fix as a pull request.
 **Links**
 - Source code: https://github.com/rootcause-1/rootcause
 - Live deployment: http://3.234.90.242/ (replay of a real run; click **Start demo**)
-- Demo video: TODO (YouTube link)
+- Demo video: https://youtu.be/tws31rPbplE
 
 **The problem.** Modern apps are dozens of services calling each other. When one breaks, everything that depends on
 it fails too, the monitoring fires an alarm for each one, and several teams get paged. Every alarm is real, but only
