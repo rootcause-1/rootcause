@@ -81,7 +81,7 @@ export default function App() {
   useEffect(() => { refreshIncident(); }, [selected, status?.tick, refreshIncident]);
 
   async function startDemo() {
-    const name = status?.replay?.scenario ?? scenarios.find((s) => s === "paymentFailure") ?? scenarios[0];
+    const name = status?.replay?.scenario ?? scenarios.find((s) => s === "productCatalogLockContention") ?? scenarios[0];
     if (!name) return;
     await api.startReplay(name).catch(() => null);
     setHistory([]); setSelected(null); setInc(null); setBlast([]); setCited([]); setTool(null);

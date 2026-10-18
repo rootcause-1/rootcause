@@ -249,3 +249,51 @@ pytest tests/graph -> 120 passed (incl. test_fix_it_in_code_opens_a_pull_request
 Clicked through in the browser on the real API (replay paymentFailure, Claude and GitHub replaced by local fakes):
 recovery → "One more thing… fix it in the code?" → Yes → "Pull request #1 is open". Not yet run with a real
 ANTHROPIC_API_KEY / GITHUB_TOKEN (needs the fork and keys, HANDOFF §2.0).
+
+## 18 Oct: Shambhvi's 17 Oct work verified on Docker (FalkorDB v4.22.1) and on the live demo
+```
+make lint test       -> All checks passed; 205 passed (unit + graph, Docker FalkorDB v4.22.1)
+make scenario-test   -> 6 passed
+cd frontend && npm run build -> built
+```
+Live API (agentic demo, LOCUST_USERS=12) scanned the demo repo on start: 37 modules, 20 with code, 26,514 lines,
+83 declared dependencies, 11 gRPC services, 23 flag reads.
+
+### productCatalogLockContention, live, with the new "database is a symptom" rule
+```
+t=0s  flag productCatalogLockContention -> on
+t=0.3s  Change CHG-0ffec7f4: off -> on
+t=39.2s  ALERT error_rate on frontend-proxy (value 0.25)
+t=39.2s  ALERT latency on frontend-proxy (value 1.5e+04)
+t=40.1s  incident INC-0001 opened
+t=54.2s  ALERT latency on product-catalog (value 8.92e+03)
+t=54.2s  ALERT latency on recommendation (value 111)
+t=54.2s  ALERT latency on frontend (value 4.47e+03)
+t=54.2s  ALERT latency on db:astronomy-db (value 8.89e+03)
+t=84.2s  ALERT memory on astronomy-db (value 12)
+t=94.2s  ALERT latency on recommendation (value 1.78e+04)
+
+open incidents created by this flip: ['INC-0001', 'INC-0002']
+
+== INC-0001  members=['db:astronomy-db', 'frontend', 'frontend-proxy', 'product-catalog', 'recommendation']  alerts=7
+   #1 product-catalog  score=0.8735  {'depth': 1.0, 'self': 1.0, 'pagerank': 0.8673, 'change': 1.0, 'memory': 0.0}
+   #2 db:astronomy-db  score=0.75  {'depth': 1.0, 'self': 1.0, 'pagerank': 1.0, 'change': 0.0, 'memory': 0.0}
+   #3 recommendation  score=0.4938  {'depth': 0.5, 'self': 1.0, 'pagerank': 0.4688, 'change': 0.0, 'memory': 0.0}
+   evidence path: ['frontend-proxy', 'frontend', 'product-catalog']
+   change: {'id': 'CHG-0ffec7f4', 'summary': 'productCatalogLockContention changed off→on'}
+   impact: []
+   proposals: [('flag_revert', 'productCatalogLockContention', 'low'), ('restart', 'product-catalog', 'high'), ('page', 'data-team', 'none')]
+   verdict: root=product-catalog confidence=0.8735 verdict at t=54.3s
+
+== INC-0002  members=['astronomy-db']  alerts=1
+   #1 astronomy-db  score=0.75  {'depth': 1.0, 'self': 1.0, 'pagerank': 1.0, 'change': 0.0, 'memory': 0.0}
+   evidence path: ['astronomy-db']
+   change: None
+   impact: []
+   proposals: [('restart', 'astronomy-db', 'high'), ('page', 'platform-team', 'none')]
+   verdict: root=astronomy-db confidence=0.75 verdict at t=99.3s
+
+reverted productCatalogLockContention (harness)
+```
+The former known miss is fixed: top-1 `product-catalog` (0.87), the database second (0.75). A separate one-alert
+incident on the `astronomy-db` *container* (memory slope) opened ~45 s later; it is not part of the main incident.

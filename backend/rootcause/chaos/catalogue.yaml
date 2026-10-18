@@ -23,8 +23,10 @@
 - {flag: productCatalogLockContention, variant: "on", off: "off", truth: product-catalog, class: latency}
   # product-catalog's own loop takes an ACCESS EXCLUSIVE lock on catalog tables (product-catalog/main.go
   # triggerLockContention). Observed: 12 alerts (latency+errors on product-catalog, db:astronomy-db, recommendation,
-  # frontend, frontend-proxy, checkout) -> 1 incident; top-1 db:astronomy-db 0.76, truth #2 at 0.73. KNOWN MISS (top-3):
-  # the slow DB looks like the deepest failure; the first proposed action is still the right flag revert.
+  # frontend, frontend-proxy, checkout) -> 1 incident; top-1 db:astronomy-db 0.76, truth #2 at 0.73 (15/16 Oct).
+  # 18 Oct, with the "unchanged database is a symptom" rule (blame_targets): latency + errors on frontend-proxy,
+  # product-catalog, db:astronomy-db, recommendation, frontend at t=39-54 s -> top-1 product-catalog 0.87, the database
+  # #2 at 0.75, change linked, flag revert proposed first. Recorded as replay/productCatalogLockContention.jsonl.gz.
 - {flag: imageSlowLoad, variant: "5sec", off: "off", truth: frontend-proxy, class: latency}
   # truth from demo source: the browser sends `x-envoy-fault-delay-request` (frontend/components/ProductCard.tsx) and
   # Envoy in frontend-proxy injects the delay; image-provider itself is not slow. Observed: latency on frontend-proxy
