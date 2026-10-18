@@ -37,7 +37,7 @@ It maps the APIs too: every gRPC service in the code, and the module that serves
 
 ## 1:50–2:01 · Break it
 
-Now we break it the way real outages start: someone changes a setting. Payment failure goes to one hundred percent, A customer tries to pay, and the shop's API rejects it. Nobody tells RootCause.
+Now we break it the way real outages start: someone changes a setting. Payment failure goes to one hundred percent. A customer tries to pay, and the shop's API rejects it. Nobody tells RootCause.
 
 ## 2:01–2:12 · Alarms become one incident
 
