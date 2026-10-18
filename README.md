@@ -9,11 +9,12 @@ approval, verifies recovery, writes the report and remembers the incident.
 
 Architecture diagram and how each part works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Picking this up? Start with [HANDOFF.md](HANDOFF.md).
 
-![RootCause during a live paymentFailure: 4 alerts become 1 incident, evidence path highlighted on the graph, low-risk fix proposed](docs/img/ui-incident.jpg)
+![RootCause on the public replay of productCatalogLockContention: alarms across two teams collapse to one root cause (product-catalog), the chat shows the code behind it, who is hurt, and asks to apply the low-risk fix](docs/img/ui-incident.jpg)
 
-> Status (16 Oct 2026): acceptance checks M0–M7 pass against the real OpenTelemetry Demo, M8 (MCP) is verified with
-> an MCP client; every catalogue fault was broken by hand and what RootCause saw is in
-> [chaos/catalogue.yaml](backend/rootcause/chaos/catalogue.yaml). Evidence: [docs/PROGRESS.md](docs/PROGRESS.md).
+> Status (18 Oct 2026): acceptance checks M0–M7 and M9–M11 pass against the real OpenTelemetry Demo, M8 (MCP) is
+> verified with an MCP client; every catalogue fault was broken by hand (16/16 top-1 or top-3, observations in
+> [chaos/catalogue.yaml](backend/rootcause/chaos/catalogue.yaml)); 7 recorded scenarios replay to the right cause in CI.
+> Evidence: [docs/PROGRESS.md](docs/PROGRESS.md). Feature list with status: [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Why a graph
 Many alerts → one incident is a **connected-components** question (`algo.WCC` over BLAMES). "Who is to blame" is
