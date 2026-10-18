@@ -241,8 +241,78 @@ function buildEnd() {
   RENDER = (t) => lines.forEach((l, i) => l.setAttribute('opacity', prog(t, 0.2 + i * 0.35, 0.7)));
 }
 
+
+/* ------------------------------------------------------------------ blog cover */
+function buildCover() {
+  S.innerHTML = '';
+  el('rect', {x:0, y:0, width:1920, height:1080, fill:C.pine});
+  el('circle', {cx:150, cy:236, r:20, fill:C.red});
+  txt(190, 260, 'RootCause', 112, C.paper, 'serif');
+  txt(120, 360, 'An AI on-call engineer', 54, '#E4E9E1', 'sans', 'start', 600);
+  txt(120, 430, 'on a FalkorDB graph', 54, '#E4E9E1', 'sans', 'start', 600);
+  txt(120, 530, 'Four alarms, one real cause: found, proven,', 32, '#AEB8AB', 'sans');
+  txt(120, 574, 'fixed with your OK, and opened as a pull request.', 32, '#AEB8AB', 'sans');
+  txt(120, 960, 'FalkorDB  ·  OpenTelemetry  ·  MCP  ·  Gemini  ·  AWS Graviton', 28, '#8FA08C', 'sans');
+  // the incident, as a graph
+  const nodes = [['Gateway', 1180, 300], ['Storefront', 1440, 420], ['Checkout', 1300, 620], ['Payment', 1600, 760],
+                 ['Cart', 1700, 260], ['Ads', 1040, 520], ['Shipping', 1080, 820]];
+  const P = Object.fromEntries(nodes.map(n => [n[0], n]));
+  const edges = [['Gateway','Storefront',1], ['Storefront','Checkout',1], ['Checkout','Payment',1], ['Storefront','Cart',0],
+                 ['Gateway','Ads',0], ['Checkout','Shipping',0]];
+  for (const [a, b, hot] of edges) {
+    el('line', {x1:P[a][1], y1:P[a][2], x2:P[b][1], y2:P[b][2], stroke: hot ? C.red : '#4A5A50', 'stroke-width': hot ? 6 : 4,
+                'stroke-dasharray': hot ? '14 10' : 'none'});
+  }
+  for (const [name, x, y] of nodes) {
+    const root = name === 'Payment', alarm = ['Gateway', 'Storefront', 'Checkout'].includes(name);
+    el('circle', {cx:x, cy:y, r: root ? 46 : 34, fill: root ? C.red : alarm ? C.amber : '#3B4A41', stroke:'#FBFAF5', 'stroke-width': root ? 6 : 0});
+    const lb = txt(x, y + (root ? 86 : 70), name, 26, root ? '#FFD9D2' : '#C9D2C6', 'sans', 'middle', root ? 700 : 500);
+    lb.setAttribute('stroke', C.pine); lb.setAttribute('stroke-width', 9); lb.setAttribute('paint-order', 'stroke'); lb.setAttribute('stroke-linejoin', 'round');
+    if (alarm) { el('rect', {x:x - 52, y:y - 78, width:104, height:32, rx:16, fill:C.red}); txt(x, y - 55, 'ALERT', 18, '#fff', 'sans', 'middle', 700); }
+  }
+  txt(1600, 880, 'root cause', 24, '#FFB4A6', 'mono', 'middle');
+  RENDER = () => {};
+}
+
+/* ------------------------------------------------------------------ AWS deployment */
+function buildAws() {
+  S.innerHTML = '';
+  const chap = txt(120, 110, 'How RootCause runs on AWS', 34, C.pine, 'sans', 'start', 650);
+  const box = (x, y, w, h, title, sub, fill, stroke) => {
+    el('rect', {x, y, width:w, height:h, rx:20, fill: fill || C.white, stroke: stroke || C.mist, 'stroke-width':3});
+    txt(x + 26, y + 50, title, 28, C.pine, 'sans', 'start', 650);
+    sub.split('\n').forEach((s, i) => txt(x + 26, y + 88 + i * 30, s, 21, C.soft, 'sans'));
+  };
+  const arrow = (x1, y1, x2, y2, label, lx, ly) => {
+    el('line', {x1, y1, x2, y2, stroke:C.soft, 'stroke-width':3, 'marker-end':'url(#ah2)'});
+    if (label) txt(lx, ly, label, 20, C.soft, 'mono', 'middle');
+  };
+  const defs = el('defs', {}); const m = el('marker', {id:'ah2', viewBox:'0 0 10 10', refX:9, refY:5, markerWidth:7, markerHeight:7, orient:'auto'}, defs);
+  el('path', {d:'M0,0 L10,5 L0,10 z', fill:C.soft}, m);
+  box(90, 240, 330, 150, 'Visitors', 'judges, anyone with the link\nhttp://3.234.90.242/');
+  box(90, 640, 330, 150, 'GitHub', 'rootcause-1/rootcause\npush to main = deploy');
+  // EC2 frame
+  el('rect', {x:560, y:180, width:1270, height:620, rx:28, fill:'#FFF7EC', stroke:C.amber, 'stroke-width':4});
+  txt(600, 236, 'Amazon EC2 · t4g.small (AWS Graviton, ARM) · Amazon Linux 2023 · Elastic IP', 26, '#8A5A12', 'sans', 'start', 650);
+  txt(600, 274, 'Docker Compose: the replay stack (2 vCPU, 2 GB, ~$12 / month)', 22, '#9A7A4A', 'sans');
+  box(620, 330, 340, 170, 'UI', 'React + Vite, served on :80\ncompany map + chat');
+  box(1040, 330, 360, 170, 'RootCause API', 'FastAPI · replay mode\nautopilot agent · MCP tools');
+  box(1460, 330, 330, 170, 'FalkorDB', 'v4.22.1 · graph rc_replay\nWCC · PageRank · paths', C.lightgreen, C.green);
+  box(1040, 600, 360, 150, 'Recorded real runs', 'replay/*.jsonl.gz, played\nthrough the live ingest code');
+  box(620, 600, 340, 150, 'Autodeploy timer', 'systemd, every 2 minutes:\npull main, rebuild if changed');
+  arrow(420, 315, 618, 400, 'HTTP :80', 470, 300);
+  arrow(960, 415, 1038, 415);
+  arrow(1400, 415, 1458, 415, 'Cypher', 1430, 316);
+  arrow(1220, 600, 1220, 502, 'replay', 1270, 560);
+  arrow(420, 715, 618, 680, 'git pull', 470, 672);
+  arrow(790, 600, 790, 502, 'rebuild', 840, 560);
+  txt(960, 880, 'Live mode runs the same code on a laptop next to the OpenTelemetry Demo, with Gemini and GitHub pull requests.', 24, C.soft, 'sans', 'middle');
+  chap.setAttribute('opacity', 1);
+  RENDER = () => {};
+}
+
 window.setup = (scene, beats) => { BEATS = beats || {};
-  ({intro: buildIntro, title: buildTitle, pipeline: buildPipeline, end: buildEnd})[scene](); RENDER(0); return true; };
+  ({intro: buildIntro, title: buildTitle, pipeline: buildPipeline, end: buildEnd, cover: buildCover, aws: buildAws})[scene](); RENDER(0); return true; };
 window.frame = (t) => { RENDER(t); return true; };
 </script>
 </body></html>
