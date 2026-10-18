@@ -543,8 +543,9 @@ Before M10, break **every** catalogue flag once by hand, write what you observe 
 **Read `HANDOFF.md` first** (status, owners, what is left today) and `docs/FEATURES.md` (every feature + status).
 18 Oct: Shambhvi's 17 Oct work (company map + chat UI, database-is-a-symptom rule, company setup, runbook
 automations, Connect your GitHub, Fix it in code) verified on Docker FalkorDB v4.22.1 (205 tests, 7/7 golden
-replays) and live; lock contention is now top-1 product-catalog and is the public demo. The notes below are the
-16 Oct state, kept for history.
+replays) and live; lock contention is now top-1 product-catalog and is the public demo. LLM switched to Gemini;
+with keys in the local `.env` the Gemini agent and Fix it in code ran live (PR yash4428/opentelemetry-demo#1);
+the public site stays keyless. The notes below are the 16 Oct state, kept for history.
 
 ### 16 Oct state (history)
 

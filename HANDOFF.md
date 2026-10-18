@@ -1,6 +1,7 @@
 # Handoff — submission day (18 Oct 2026)
 
-Updated 18 Oct, ~13:00 IST, by Yash (with Claude Code) after pulling and verifying Shambhvi's 17 Oct work.
+Updated 18 Oct, ~13:10 IST, by Yash (with Claude Code): Shambhvi's 17 Oct work verified; LLM switched to Gemini;
+Gemini agent and Fix it in code run for real with keys.
 Read this, then `docs/FEATURES.md` (every feature with its status) and `CLAUDE.md` §0 (rules).
 
 **Deadlines today:** feature freeze **2:00 PM IST** · submission **11:59 PM IST**
@@ -20,8 +21,10 @@ Read this, then `docs/FEATURES.md` (every feature with its status) and `CLAUDE.m
 | Public demo | **http://3.234.90.242/** now opens on the lock-contention story ("alarms on 5 services, 2 teams, 1 cause"); redeploys itself from `main` | `docs/DEPLOY.md` |
 | Connect your GitHub | works live and on the public site (scans the demo repo on start: 37 modules, 26.5k lines, flag reads with file:line) | `docs/PROGRESS.md`, README |
 | UI | Shambhvi's company map (customers → team lanes → shared infra) + WhatsApp-style chat narrator, **Start demo** runs the whole story by itself | `frontend/src/components/` |
-| Blind chaos scorecard | batch of 15 **running now** on Yash's laptop (started 12:45, ~3 h); last finished batch (16 Oct): 87 % top-1 / 93 % top-3 | `docs/SCORECARD.md`, `docs/scorecards/` |
-| Fix it in code (Gemini writes a fix, opens a PR) | built and tested with fakes; **not run for real** (needs a fork + keys, see §2.4) | `docs/FEATURES.md` |
+| Blind chaos scorecard | batch of 15 **running now** on Yash's laptop (restarted 13:05 after the Gemini switch, ~3 h, now includes the `llm_no_graph` Gemini baseline); last finished batch (16 Oct): 87 % top-1 / 93 % top-3 | `docs/SCORECARD.md`, `docs/scorecards/` |
+| LLM agent (Gemini, `RC_AGENT_MODE=llm`) | **works live**: Gemini picked 8 MCP tools, verdict payment 0.9, wrote the narrative and report summary | `docs/PROGRESS.md` (18 Oct, LLM agent) |
+| Fix it in code (Gemini writes a fix, opens a PR) | **works live**: opened https://github.com/yash4428/opentelemetry-demo/pull/1 (one-line guard in `src/payment/charge.js`) | `docs/PROGRESS.md` (18 Oct, LLM agent) |
+| Keys | `GEMINI_API_KEY` + `GITHUB_TOKEN` only in Yash's local `.env` (gitignored). **The public site stays keyless on purpose**: anonymous visitors would spend Gemini credit and open PRs | §2.4 |
 
 Remaining honest weak spots (fine to mention in the video or README): `kafkaQueueProblems` floods the database, which
 forms its own incident; the UI is built for laptop/desktop, not phones; the pager list reads a file, not the graph.
@@ -42,7 +45,7 @@ forms its own incident; the UI is built for laptop/desktop, not phones; the page
 - Upload (YouTube unlisted is fine), then replace `_TODO: add YouTube link_` in `README.md`.
 
 ### 2.2 Scorecard — Owner: Yash (Claude is watching the batch)
-When `make chaos` finishes (~15:45 IST): the API regenerates `docs/SCORECARD.md`; archive it to `docs/scorecards/`,
+When `make chaos` finishes (~16:15 IST): the API regenerates `docs/SCORECARD.md`; archive it to `docs/scorecards/`,
 run `uv run python scripts/sync_readme_scorecard.py`, add a row to the batch table in `docs/PROGRESS.md`, commit.
 Never type the numbers by hand. If the batch fails, the 16 Oct numbers already in README stay valid.
 
@@ -50,12 +53,13 @@ Never type the numbers by hand. If the batch fails, the 16 Oct numbers already i
 - `## Team`: both of you check the draft (who did what) and delete the "_Both: edit…_" line.
 - Video link (2.1). Everything else in README is current as of today (screenshot, status, features, scorecard).
 
-### 2.4 Optional: Fix it in code, for real — Owner: whoever has the keys. Skip if short on time.
-1. Fork https://github.com/open-telemetry/opentelemetry-demo into `rootcause-1`.
-2. Fine-grained GitHub token for **that fork only** (Contents + Pull requests read/write).
-3. On the AWS host `.env` (Yash, SSH): `GEMINI_API_KEY`, `GITHUB_TOKEN`, `RC_PR_REPO=rootcause-1/opentelemetry-demo`,
-   `RC_CODE_REPO=https://github.com/rootcause-1/opentelemetry-demo`, then `scripts/deploy_aws.sh`.
-Without keys the chat simply does not offer the pull request; nothing breaks.
+### 2.4 Fix it in code / LLM agent — done locally (18 Oct). Owner: Yash
+Fork: `yash4428/opentelemetry-demo`; fine-grained token for that fork only (Contents + Pull requests read/write);
+both keys in Yash's local `.env`. Proof: PR #1 above and `docs/PROGRESS.md`. To show it in the video, run it on the
+live stack (`RC_AGENT_MODE=llm` in `.env`, rebuild `rootcause-api` with `--no-deps`, `POST /api/code/scan` with the
+fork URL, break `paymentFailure`, approve the revert, then the pull request). **Do not put the keys on the public AWS
+host** unless you take them off again right after recording. Without keys the chat simply does not offer the pull
+request; nothing breaks. Revoke the GitHub token after judging.
 
 ### 2.5 Optional: Claude Desktop check (closes M8) — Owner: anyone with Claude Desktop, 5 minutes
 README "Use it from Claude Desktop" snippet → ask "Who owns payment?" → paste the answer under M8 in PROGRESS.

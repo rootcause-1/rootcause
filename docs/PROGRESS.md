@@ -139,7 +139,7 @@ approving ACT-0c13fb6a (flag_revert paymentFailure, risk low)
 - Autopilot agent JSON on every incident (root_cause, confidence, evidence_path, change, impact,
   proposed_actions, narrative) and its Step trail is visible in the UI's Agent trail.
 - **Open:** the final check in Claude Desktop itself (a human pastes the README snippet into
-  `claude_desktop_config.json`) and LLM agent mode (`RC_AGENT_MODE=llm` needs `ANTHROPIC_API_KEY`).
+  `claude_desktop_config.json`). LLM agent mode: done live on 18 Oct with Gemini (see the 18 Oct section below).
 - Detector fix found via the UI: checkout/payment get ~2 requests/min, so some 60 s windows have no payment spans;
   those were treated as healthy and resolved the alert. Now a too-quiet window is `no_data` and holds state.
 
@@ -297,3 +297,41 @@ reverted productCatalogLockContention (harness)
 ```
 The former known miss is fixed: top-1 `product-catalog` (0.87), the database second (0.75). A separate one-alert
 incident on the `astronomy-db` *container* (memory slope) opened ~45 s later; it is not part of the main incident.
+
+## 18 Oct: LLM agent (Gemini) and Fix it in code, live with real keys
+Local stack only (`GEMINI_API_KEY`, `GITHUB_TOKEN`, `RC_PR_REPO=yash4428/opentelemetry-demo` in the gitignored
+`.env`; the public site stays keyless). `RC_AGENT_MODE=llm`, model `gemini-3.8-flash`, fork scanned first
+(`POST /api/code/scan`: 37 modules, 23 flag reads).
+`uv run python scripts/acceptance_check.py --flag paymentFailure --approve --wait 240 --settle 40`:
+```
+t=0s  flag paymentFailure -> 100%
+t=0.7s  Change CHG-183ff47e: off -> 100%
+t=24.5s  ALERT error_rate on frontend (value 0.2)
+t=26.1s  incident INC-0001 opened
+t=29.5s  ALERT error_rate on frontend-proxy (value 0.2)
+t=29.5s  ALERT error_rate on checkout (value 0.2)
+t=29.5s  ALERT error_rate on payment (value 0.2)
+open incidents created by this flip: ['INC-0001']
+== INC-0001  members=['checkout', 'frontend', 'frontend-proxy', 'payment']  alerts=4
+   #1 payment  score=0.9  {'depth': 1.0, 'self': 1.0, 'pagerank': 1.0, 'change': 1.0, 'memory': 0.0}
+   #2 checkout  score=0.3114  {'depth': 0.5, 'self': 0.0, 'pagerank': 0.8069, 'change': 0.0, 'memory': 0.0}
+   #3 frontend  score=0.2661  {'depth': 0.5, 'self': 0.0, 'pagerank': 0.5803, 'change': 0.0, 'memory': 0.0}
+   evidence path: ['frontend-proxy', 'frontend', 'checkout', 'payment']
+   change: {'id': 'CHG-183ff47e', 'summary': 'Flag paymentFailure changed from off to 100%'}
+   proposals: [('flag_revert', 'paymentFailure', 'low'), ('code_fix', 'src/payment', 'low'), ('restart', 'payment', 'high'), ('page', 'payments-team', 'none')]
+   verdict: root=payment confidence=0.9 verdict at t=67.3s
+approving ACT-3ef51dc8 (flag_revert paymentFailure, risk low)
+   resolved after 81s: ttr_ms=153935 resolution=fixed
+```
+`GET /api/incidents/INC-0001`: `fallback: None` (the Gemini agent finished, no autopilot fallback); Gemini picked
+`get_incident, rank_root_causes, trace_evidence_path, what_changed, measure_impact, find_similar_incidents, who_owns,
+propose_action`; its narrative cites CHG-183ff47e, the checkout journey drop and ACT-3ef51dc8. The report
+(`reports/INC-0001.md`) has a Gemini-written summary.
+
+Then `POST /api/actions/ACT-c4085cf9/approve` (code_fix) → GitHub `201 Created` for the branch and the pull request:
+**https://github.com/yash4428/opentelemetry-demo/pull/1** "Guard payment failure injection to synthetic requests
+only", 1 file (`src/payment/charge.js`, +1 −1: `if (syntheticRequest && numberVariant > 0)`; `syntheticRequest` is
+already defined at line 32, so the patch is valid). Bug found by this run: the PR opened after the revert had healed
+the graph, so its body showed the evidence path as just `payment`. Fixed (`730d11c`): the PR body uses the verdict's
+diagnosis-time path, like the report; the end-to-end graph test now covers it. `make lint test` → 206 passed.
+

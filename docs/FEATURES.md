@@ -65,7 +65,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 | --- | --- | --- |
 | MCP server | 16 tools (read: incidents, ranking, evidence, changes, impact, blast radius, predict, similar, owner, runbook, read-only Cypher; write: propose, execute-with-token, verify, report). stdio for Claude Desktop, HTTP on :8811. | tested with an MCP client; Claude Desktop check open |
 | Autopilot | The same investigation as a fixed tool sequence, no LLM. Default. | live |
-| LLM agent | Gemini picks the tools (12 calls / 90 s budget), can draft but never execute. | needs `GEMINI_API_KEY` |
+| LLM agent | Gemini picks the tools (12 calls / 90 s budget), can draft but never execute. | live with a key (`RC_AGENT_MODE=llm`, verified 18 Oct); public site uses autopilot |
 | Step trail | Every tool call → `Step` -[:NEXT]-> `Step`, -[:CITED]-> the nodes it used. | live |
 
 ### Proving it works
@@ -73,7 +73,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 | --- | --- | --- |
 | Chaos lab | Blind runs: random fault flipped by the harness, engine not told; scored against the catalogue afterwards. | live |
 | Scorecard | Compared with 5 baselines (loudest alert, first alert, highest error, graph off, LLM without graph); generated, never typed. | live (LLM baseline needs key) |
-| Record / replay | Every engine input recorded; played back through the same pipeline; actions simulated. 6 recordings, public site. | live |
+| Record / replay | Every engine input recorded; played back through the same pipeline; actions simulated. 7 recordings, public site. | live |
 | Golden tests | Each recording replayed into a fresh graph; top-1 must equal the truth. | tested |
 
 ### Using it (UI and setup)
@@ -83,7 +83,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 | Chat narrator | WhatsApp-style chat driven by real incident state; "Yes, fix it"; demo autoplay in replay only. | live |
 | Tabs | Break something, Predict, Memory, Reports, **Your company**. | live (company: new) |
 | Connect your GitHub | Codebase tab: shallow clone + read of a public repo → CodeModule/IMPLEMENTS/DECLARES/READ_IN/TOUCHED in the graph; chat shows the code behind the root cause (file:line link); agent `read_code` step; code-vs-traffic drift. | new, unit + graph tests, checked end to end on the real API |
-| Fix it in code | After recovery the chat offers a pull request: Gemini writes a find/replace fix for the file where the root reads the changed flag; RootCause opens it on our fork with the graph evidence; `(:PullRequest)-[:FIXES]->(:Incident)`. | new, tested with fakes; needs keys for the real thing |
+| Fix it in code | After recovery the chat offers a pull request: Gemini writes a find/replace fix for the file where the root reads the changed flag; RootCause opens it on our fork with the graph evidence; `(:PullRequest)-[:FIXES]->(:Incident)`. | live with keys: opened yash4428/opentelemetry-demo#1 on 18 Oct; off on the public site |
 | Your company | Teams, on-call, ownership, journeys, runbooks + automation URLs, edited in the graph (ingestion reads journey routes from the graph); export seed.yaml. | new |
 
 ## 3. Is FalkorDB used properly? Yes. The details:
