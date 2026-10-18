@@ -1,5 +1,53 @@
 # Demo video script (≤ 3 min)
 
+## Final version (18 Oct): the real run, ending with a real pull request
+
+Everything on screen is the real system on one laptop: the OpenTelemetry Demo shop, RootCause in LIVE mode with the
+Gemini agent, our fork on GitHub (`yash4428/opentelemetry-demo`) and the FalkorDB Browser. The public replay site only
+appears on the end card. Illustrated version with screenshots: the "RootCause Field Guide" artifact (ask Yash for the link).
+~400 spoken words; say the numbers you actually see on screen.
+
+| Time | On screen / you do | Say |
+|---|---|---|
+| 0:00–0:20 | Cut from scene 5: the map as the alarms light up, title card. | "It's 3 AM. Four alarms go off across two teams. Every alarm is real, but only one service is actually broken, and finding it is the slow part of every outage. RootCause finds it in about a minute, proves it, fixes it with your OK, and opens the code fix as a pull request." |
+| 0:20–0:35 | Shop at `localhost:8080` (browse, add to cart), then the RootCause map, all green, LIVE badge. | "This is the official OpenTelemetry Demo: a real online shop with 19 services and live traffic, running on our laptop. Every five seconds RootCause turns its traces and metrics into a live graph in FalkorDB: who calls whom, who owns what, and what just changed." |
+| 0:35–0:45 | Codebase tab: paste `https://github.com/yash4428/opentelemetry-demo`, Scan. | "We connect the shop's GitHub repo too, so the graph knows which code runs each service and where every feature flag is read." |
+| 0:45–0:58 | `localhost:8080/feature`: `paymentFailure` → `100%`, Save. Place an order: it fails. | "Now a bad config change goes out: the payment-failure flag is set to one hundred percent. Checkout breaks. We don't tell RootCause anything." |
+| 0:58–1:20 | Map turns amber; chat "4 alarms… one incident", then "What I'm checking in the graph" fills with Gemini's tool calls. Hover one: the map lights up the nodes it cited. (speed up the wait) | "Alarms fire on payment, checkout, the storefront and the gateway. RootCause sees in the graph that they're connected, so it opens one incident instead of four pages. Its Gemini agent investigates through our MCP tools: it ranks the suspects, traces the evidence and checks what changed." |
+| 1:20–1:45 | Payment red, red trail gateway → storefront → checkout → payment; flag change; "The code behind it" → click the `charge.js` line (GitHub opens on it); who hurts; who's on call. | "The root cause is payment. The blame runs through the graph from the gateway down to payment, payment's own requests are failing, and its flag changed a minute before the alarms. RootCause shows the exact line of code that reads that flag, the customers who can't check out, and who's on call." |
+| 1:45–2:05 | "Should I fix this?" risk low → **Yes, fix it** → Fixing → All clear. (speed up ~80 s, show "4×") | "It offers the safest fix first: switch the flag back. That's low risk. A restart would be riskier, so it would need typed confirmation. I approve. RootCause applies the fix, waits until every alarm has cleared, and only then marks the incident resolved." |
+| 2:05–2:35 | "One more thing… fix it in the code?" → **Yes, open a pull request** → PR link → GitHub: description (root cause, evidence path, change, impact) → Files changed → read it → Merge (or "Review changes" if it looks wrong). | "The flag is off, but the code that failed is still there. RootCause reads that file from GitHub, Gemini writes a change, and RootCause opens a pull request with the evidence from the graph. It never merges or deploys anything itself. A person reviews the change and merges it." |
+| 2:35–2:55 | FalkorDB Browser `localhost:3300`, graph `rc_live`, run the query below; then 3 s of the scorecard. | "All of this lives in one FalkorDB graph: services, alarms, the agent's steps, incident memory and the pull request. Connected components group the alarms, PageRank follows the blame, and shortest path gives the proof. In fifteen blind tests with random faults, RootCause named the right cause eighty-seven percent of the time. Blaming the loudest alarm got forty." |
+| 2:55–3:00 | End card: RootCause · http://3.234.90.242/ · github.com/rootcause-1/rootcause · Track 01. | "Next time, it remembers what worked. That's RootCause." |
+
+Swap the scorecard numbers for the 18 Oct batch when it finishes (it adds the Gemini-without-graph baseline).
+
+```cypher
+MATCH (p:PullRequest)-[f:FIXES]->(i:Incident)-[rc:ROOT_CAUSE]->(r)
+OPTIONAL MATCH (p)-[c:CHANGES]->(m:CodeModule)
+OPTIONAL MATCH (i)<-[po:PART_OF]-(a:Alert)
+RETURN p, f, i, rc, r, c, m, po, a
+```
+
+**Say these parts carefully (honesty):**
+- The flag revert stops the bleeding and recovery is verified before the PR exists. The PR is the follow-up.
+- Merging does not change the running shop (it runs prebuilt images). Say "after review, your CI/CD ships it".
+- Gemini writes a different change each run: read the diff before merging on camera. PR #1's change only keeps the
+  failure for `synthetic_request` traffic, and the demo's load generator marks all its traffic synthetic
+  (`src/load-generator/locustfile.py`), so in this demo that exact change would not stop the errors if deployed.
+- Why the fork and not a new buggy repo: the hackathon data rule (telemetry from the OpenTelemetry Demo only),
+  RootCause only sees services that send it traces, and the fork's fault paths are real code behind feature flags.
+
+**Before recording:** chaos batch finished; `RC_AGENT_MODE=llm` in `.env`;
+`docker compose -f infra/docker-compose.yml --env-file .env up -d --no-deps rootcause-api`;
+`curl -X POST http://localhost:8000/api/admin/reset`, wait 3 min; optionally close PR #1; open the five tabs
+(shop, `/feature`, `localhost:8088`, the fork, `localhost:3300`); Mac plugged in, Do Not Disturb; one rehearsal
+(PR cooldown is 10 min). Backup: record the public site's self-running story and use PR #1 for the GitHub part.
+
+## Earlier drafts (15–17 Oct)
+
+### Version 1: graph-first walkthrough
+
 Recorded from the real system: the OpenTelemetry Demo (agentic mode) + RootCause on one laptop, or the public replay
 site (same code path, recorded telemetry). Screen: 1920×1080, UI at `localhost:8088` (or the public URL), browser zoom
 110 %. Numbers below are from our live runs on 15 Oct 2026; read them off the screen when recording.
@@ -20,7 +68,7 @@ site (same code path, recorded telemetry). Screen: 1920×1080, UI at `localhost:
 | 2:40–2:55 | `docs/SCORECARD.md`: 15 blind runs — RootCause 87 % top-1 / 93 % top-3, median 53 s; graph signals off 80 %; loudest / first / highest-error alert 40 %; the two misses listed. | "Fifteen blind chaos runs on the real demo: 87 percent top-1, against 40 percent for the usual alert heuristics. Turn the graph signals off and it drops. And we list our misses." |
 | 2:55–3:00 | URL + repo + "FalkorDB · Track 01: Agents That Act on Connected Data". | "RootCause. Try the replay at the link below." |
 
-## Version 2: "give it your GitHub" (17 Oct, the flow the team wants)
+### Version 2: "give it your GitHub" (17 Oct)
 
 Needs: our fork of the demo shop (e.g. `rootcause-1/opentelemetry-demo`), `GITHUB_TOKEN` (fine-grained, that fork
 only, Contents + Pull requests read/write), `GEMINI_API_KEY`, `RC_PR_REPO=<owner/fork>` in `.env`.
@@ -33,7 +81,7 @@ only, Contents + Pull requests read/write), `GEMINI_API_KEY`, `RC_PR_REPO=<owner
 | 0:55 | Alarms, one incident, investigating | "Alarms fire on several services owned by different teams. RootCause groups them into one incident with graph algorithms." |
 | 1:15 | Root cause + "The code behind it: src/payment/charge.js:40" | "It finds the one real cause, proves it with the evidence path, and points at the exact line of code." |
 | 1:35 | Fix popup → Yes, fix it → recovery ticks | "It proposes the safest fix with its side effects, and a person approves it. The alarms clear and recovery is checked." |
-| 2:00 | "One more thing… Want me to fix it in the code?" → Yes, open a pull request | "The switch is off, but the bad code is still there. So RootCause asks Claude to write a small fix…" |
+| 2:00 | "One more thing… Want me to fix it in the code?" → Yes, open a pull request | "The switch is off, but the bad code is still there. So RootCause asks Gemini to write a small fix…" |
 | 2:20 | "Pull request #N is open" → click the link, show the PR on GitHub (diff + description with the evidence) | "…and opens a real pull request on GitHub, with the evidence from the graph. A human reviews and merges it. That's an agent acting on connected data." |
 
 Tip: do one dry run first. The PR cooldown (`code.pr_cooldown_minutes`, 10) blocks a second PR within 10 minutes.
