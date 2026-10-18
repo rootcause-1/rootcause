@@ -1,0 +1,248 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RootCause motion</title>
+<style>
+  :root { --paper:#FBFAF5; --porcelain:#F5F3EA; --pine:#1E2621; --soft:#6E726A; --mist:#E2DED0; --green:#1F5C45;
+          --amber:#D98E2F; --red:#D2513F; --plum:#7C66C7; }
+  html, body { margin:0; width:1920px; height:1080px; overflow:hidden; background:var(--paper); }
+  svg { display:block; }
+  .serif { font-family: Georgia, 'Times New Roman', serif; }
+  .sans { font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif; }
+  .mono { font-family: Menlo, monospace; }
+</style></head>
+<body>
+<svg id="s" width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg>
+<script>
+const S = document.getElementById('s');
+const NS = 'http://www.w3.org/2000/svg';
+const C = { paper:'#FBFAF5', porcelain:'#F5F3EA', pine:'#1E2621', soft:'#6E726A', mist:'#E2DED0', green:'#1F5C45',
+            amber:'#D98E2F', red:'#D2513F', plum:'#7C66C7', white:'#FFFFFF', lightred:'#F7E1DC', lightamber:'#F6E9D3', lightgreen:'#E3EDE6' };
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent||S).appendChild(e); return e; }
+function txt(x, y, s, size, fill, cls, anchor, weight) { const t = el('text', {x, y, 'font-size':size, fill, class:cls||'sans', 'text-anchor':anchor||'start', 'font-weight':weight||400}); t.textContent = s; return t; }
+const clamp = (x, a=0, b=1) => Math.max(a, Math.min(b, x));
+const ease = x => { x = clamp(x); return x*x*(3-2*x); };
+const prog = (t, start, dur) => ease((t - start) / dur);
+function mix(a, b, k) { const pa = a.match(/\w\w/g).map(h=>parseInt(h,16)), pb = b.match(/\w\w/g).map(h=>parseInt(h,16));
+  return '#' + pa.map((v,i)=>Math.round(v+(pb[i]-v)*k).toString(16).padStart(2,'0')).join(''); }
+let BEATS = {}; let RENDER = () => {};
+const B = (k, d) => (BEATS[k] ?? d);
+
+/* ------------------------------------------------------------------ the problem */
+function buildIntro() {
+  S.innerHTML = '';
+  const chap = txt(120, 120, 'The problem', 30, C.soft, 'sans', 'start', 500);
+  const services = [
+    {id:'customers', label:'Customers', sub:'checking out', x:150,  y:520, kind:'cust'},
+    {id:'gateway',   label:'Website gateway', sub:'storefront team', x:470, y:520},
+    {id:'store',     label:'Web storefront', sub:'storefront team', x:820, y:520},
+    {id:'checkout',  label:'Checkout', sub:'payments team', x:1170, y:520},
+    {id:'payment',   label:'Payment', sub:'payments team', x:1520, y:520},
+    {id:'cart',      label:'Cart', sub:'', x:820,  y:300, minor:true},
+    {id:'ads',       label:'Ads', sub:'', x:470,  y:300, minor:true},
+    {id:'shipping',  label:'Shipping', sub:'', x:1170, y:300, minor:true},
+    {id:'email',     label:'Email', sub:'', x:1170, y:760, minor:true},
+    {id:'catalog',   label:'Product catalog', sub:'', x:820, y:760, minor:true},
+  ];
+  const links = [['customers','gateway'],['gateway','store'],['store','checkout'],['checkout','payment'],
+                 ['store','cart'],['gateway','ads'],['checkout','shipping'],['checkout','email'],['store','catalog']];
+  const pos = Object.fromEntries(services.map(s => [s.id, s]));
+  const gLinks = el('g', {}), gDots = el('g', {}), gNodes = el('g', {}), gOver = el('g', {});
+  const L = links.map(([a, b]) => ({a, b, line: el('line', {x1:pos[a].x, y1:pos[a].y, x2:pos[b].x, y2:pos[b].y, stroke:C.mist, 'stroke-width':4}, gLinks)}));
+  const dots = [];
+  for (const l of L) for (let k = 0; k < 3; k++) dots.push({l, k, c: el('circle', {r:7, fill:C.green, opacity:0}, gDots)});
+  const N = services.map(s => {
+    const g = el('g', {}, gNodes);
+    const w = s.minor ? 190 : 250, h = s.minor ? 64 : 96;
+    const r = el('rect', {x:s.x - w/2, y:s.y - h/2, width:w, height:h, rx:18, fill:C.white, stroke:C.mist, 'stroke-width':3}, g);
+    const t1 = txt(s.x, s.y + (s.minor ? 8 : -4), s.label, s.minor ? 22 : 28, C.pine, 'sans', 'middle', 600); g.appendChild(t1);
+    let t2 = null; if (s.sub) { t2 = txt(s.x, s.y + 30, s.sub, 19, C.soft, 'sans', 'middle'); g.appendChild(t2); }
+    const badge = el('g', {opacity:0}, gOver);
+    el('rect', {x:s.x - 80, y:s.y - h/2 - 50, width:160, height:38, rx:19, fill:C.red}, badge);
+    const bt = txt(s.x, s.y - h/2 - 24, 'ALERT', 20, C.white, 'sans', 'middle', 700); badge.appendChild(bt);
+    return {s, g, r, t1, t2, w, h, badge};
+  });
+  const NN = Object.fromEntries(N.map(n => [n.s.id, n]));
+  // pagers
+  const pagers = [['Storefront team', 'Website gateway, Web storefront', 0], ['Payments team', 'Checkout, Payment', 1]].map(([team, svc, i]) => {
+    const g = el('g', {opacity:0}, gOver);
+    el('rect', {x:0, y:0, width:420, height:118, rx:22, fill:C.pine}, g);
+    const a = txt(28, 44, '🔔  03:00 · PAGE: ' + team, 23, C.white, 'sans', 'start', 600); g.appendChild(a);
+    const b = txt(28, 84, 'alerts on ' + svc, 21, '#C9CEC6', 'sans'); g.appendChild(b);
+    return {g, i};
+  });
+  const q1 = txt(960, 960, '', 46, C.pine, 'serif', 'middle'); gOver.appendChild(q1);
+  RENDER = (t) => {
+    const tIn = B('services', 0.3), tCalls = B('calls', 3.0), tBreak = B('break', 7.0), tCheckout = B('checkout', 9.0),
+          tStore = B('store', 10.6), tGateway = B('gateway', 12.0), tPager = B('pager', 13.5), tReal = B('real', 16.0),
+          tOnly = B('only', 19.0), tSlow = B('slow', 22.0);
+    chap.setAttribute('opacity', prog(t, tIn, 0.6));
+    N.forEach((n, i) => {
+      const k = prog(t, tIn + (n.s.minor ? 1.2 + i * 0.12 : i * 0.25), 0.6);
+      n.g.setAttribute('opacity', k * (n.s.minor ? 0.55 : 1));
+      n.g.setAttribute('transform', `translate(0 ${(1 - k) * 24})`);
+    });
+    L.forEach((l, i) => l.line.setAttribute('opacity', prog(t, tIn + 0.6 + i * 0.1, 0.6)));
+    const failT = {payment: tBreak, checkout: tCheckout, store: tStore, gateway: tGateway};
+    // node states
+    for (const id in failT) {
+      const n = NN[id], k = prog(t, failT[id], 0.5);
+      const col = id === 'payment' ? C.red : C.amber;
+      const dim = prog(t, tOnly, 0.8) * (id === 'payment' ? 0 : 1);
+      n.r.setAttribute('stroke', mix(C.mist.slice(1), col.slice(1), k).replace('##', '#'));
+      n.r.setAttribute('fill', mix('FFFFFF', (id === 'payment' ? C.lightred : C.lightamber).slice(1), k));
+      n.g.setAttribute('opacity', 1 - 0.65 * dim);
+      const kb = prog(t, failT[id] + 0.25, 0.35);
+      n.badge.setAttribute('opacity', kb * (1 - 0.7 * dim));
+      n.badge.setAttribute('transform', `translate(0 ${(1 - kb) * 10})`);
+    }
+    // payment glow at the reveal
+    const glow = prog(t, tOnly, 0.8);
+    NN.payment.r.setAttribute('stroke-width', 3 + 5 * glow);
+    // links: failing ones turn red after their callee fails
+    L.forEach(l => {
+      const tf = failT[l.b];
+      if (tf !== undefined) l.line.setAttribute('stroke', mix(C.mist.slice(1), C.red.slice(1), prog(t, tf, 0.6)));
+    });
+    // request dots: flow while healthy; on failing links they turn red
+    dots.forEach(d => {
+      const {l, k} = d; const a = pos[l.a], b = pos[l.b];
+      const on = prog(t, tCalls, 1.0);
+      const ph = ((t * 0.45 + k / 3 + (l.a.length * 0.07)) % 1);
+      d.c.setAttribute('cx', a.x + (b.x - a.x) * ph); d.c.setAttribute('cy', a.y + (b.y - a.y) * ph);
+      const tf = failT[l.b];
+      const bad = tf !== undefined ? prog(t, tf, 0.4) : 0;
+      d.c.setAttribute('fill', bad > 0.5 ? C.red : C.green);
+      d.c.setAttribute('opacity', on * (l.b.length && pos[l.b].minor ? 0.4 : 0.9));
+    });
+    pagers.forEach(p => {
+      const k = prog(t, tPager + p.i * 0.8, 0.6);
+      p.g.setAttribute('opacity', k * (1 - 0.6 * prog(t, tOnly, 0.8)));
+      p.g.setAttribute('transform', `translate(${1440 + (1 - k) * 400} ${96 + p.i * 138})`);
+    });
+    let msg = '', mo = 0;
+    if (t >= tReal) { msg = 'Four alarms. Every one is real.'; mo = prog(t, tReal, 0.5); }
+    if (t >= tOnly) { msg = 'Only one service is actually broken.'; mo = prog(t, tOnly, 0.5); }
+    if (t >= tSlow) { msg = 'Finding it by hand is the slowest part of every outage.'; mo = prog(t, tSlow, 0.5); }
+    q1.textContent = msg; q1.setAttribute('opacity', mo);
+  };
+}
+
+/* ------------------------------------------------------------------ title */
+function buildTitle() {
+  S.innerHTML = '';
+  el('rect', {x:0, y:0, width:1920, height:1080, fill:C.pine});
+  const dot = el('circle', {cx:690, cy:470, r:16, fill:C.red});
+  const t = txt(980, 500, 'RootCause', 150, C.paper, 'serif', 'middle');
+  const s1 = txt(960, 600, 'An AI on-call engineer that sees your system as a graph,', 40, '#D6DCD3', 'sans', 'middle');
+  const s2 = txt(960, 656, 'finds the one real cause, and fixes it with your OK.', 40, '#D6DCD3', 'sans', 'middle');
+  const s3 = txt(960, 800, 'Graph Hacks 2026  ·  FalkorDB  ·  Track 01: Agents That Act on Connected Data', 28, '#9FA89C', 'sans', 'middle');
+  RENDER = (tt) => {
+    const k = prog(tt, 0.2, 0.9);
+    t.setAttribute('opacity', k); t.setAttribute('transform', `translate(0 ${(1-k)*20})`);
+    dot.setAttribute('opacity', prog(tt, 0.6, 0.4)); dot.setAttribute('r', 16 + 3 * Math.sin(tt * 4));
+    s1.setAttribute('opacity', prog(tt, 1.0, 0.8)); s2.setAttribute('opacity', prog(tt, 1.4, 0.8));
+    s3.setAttribute('opacity', prog(tt, 2.2, 0.8));
+  };
+}
+
+/* ------------------------------------------------------------------ how it works */
+function buildPipeline() {
+  S.innerHTML = '';
+  const chap = txt(120, 120, 'How it works', 30, C.soft, 'sans', 'start', 500);
+  const box = (x, y, w, h, n, title, sub, kind) => {
+    const g = el('g', {opacity:0});
+    const r = el('rect', {x, y, width:w, height:h, rx:20, fill: kind === 'db' ? C.lightgreen : C.white, stroke: kind === 'db' ? C.green : C.mist, 'stroke-width':3}, g);
+    if (n) { const c = txt(x + 22, y + 38, n, 20, C.soft, 'mono'); g.appendChild(c); }
+    const a = txt(x + 22, y + (n ? 72 : 52), title, kind === 'db' ? 36 : 27, C.pine, 'sans', 'start', 650); g.appendChild(a);
+    const lines = sub.split('\n');
+    lines.forEach((ln, i) => { const b = txt(x + 22, y + (n ? 106 : 88) + i * 27, ln, 20, C.soft, 'sans'); g.appendChild(b); });
+    return {g, r, x, y, w, h};
+  };
+  // left: inputs
+  const shop = box(80, 190, 380, 150, '1', 'The shop', 'OpenTelemetry Demo, on our laptop\nreal customer traffic');
+  const coll = box(80, 400, 380, 150, '2', 'Collector', 'sends a copy of every trace');
+  const ingest = box(80, 610, 380, 150, '3', 'Ingest, every 5 s', 'traces → calls, queues, journeys\nmetrics · restarts · flag changes');
+  const gh = box(80, 820, 380, 130, '', 'GitHub repo', 'code → modules, APIs, flag reads');
+  // centre: FalkorDB
+  const db = box(600, 300, 640, 520, '4', 'FalkorDB graph', 'the single source of truth', 'db');
+  // right: steps
+  const det = box(1380, 150, 460, 132, '5', 'Detector', 'learns normal · raises alarms');
+  const eng = box(1380, 312, 460, 132, '6', 'Engine', 'BLAMES · WCC · PageRank · path');
+  const agent = box(1380, 474, 460, 132, '7', 'Agent', 'Gemini picks from 16 MCP tools');
+  const act = box(1380, 636, 460, 132, '8', 'Actions', 'safest fix first · you approve');
+  const ui = box(1380, 798, 460, 132, '9', 'You', 'map + chat · report · pull request');
+  const arrows = el('g', {}), packets = el('g', {});
+  const mk = (x1, y1, x2, y2) => el('line', {x1, y1, x2, y2, stroke:C.soft, 'stroke-width':3, 'marker-end':'url(#ah)', opacity:0}, arrows);
+  const defs = el('defs', {});
+  const m = el('marker', {id:'ah', viewBox:'0 0 10 10', refX:9, refY:5, markerWidth:7, markerHeight:7, orient:'auto'}, defs);
+  el('path', {d:'M0,0 L10,5 L0,10 z', fill:C.soft}, m);
+  const A = {
+    shop_coll: mk(270, 340, 270, 398), coll_ing: mk(270, 550, 270, 608), ing_db: mk(460, 685, 598, 640), gh_db: mk(460, 885, 598, 760),
+    db_det: mk(1240, 380, 1378, 216), db_eng: mk(1240, 480, 1378, 378), db_agent: mk(1240, 560, 1378, 540),
+    db_act: mk(1240, 640, 1378, 702), db_ui: mk(1240, 740, 1378, 864),
+  };
+  // mini graph inside the DB box
+  const g2 = el('g', {});
+  const pts = []; const R = (a, b) => a + Math.random() * (b - a);
+  Math.random = (function () { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  for (let i = 0; i < 26; i++) pts.push({x: R(650, 1190), y: R(470, 790), c: [C.green, C.plum, C.amber, C.soft][i % 4]});
+  const edges = []; for (let i = 1; i < pts.length; i++) { const j = Math.floor(Math.random() * i); edges.push([i, j]); }
+  for (let i = 0; i < 10; i++) edges.push([Math.floor(Math.random() * 26), Math.floor(Math.random() * 26)]);
+  const E = edges.map(([a, b]) => el('line', {x1:pts[a].x, y1:pts[a].y, x2:pts[b].x, y2:pts[b].y, stroke:C.soft, 'stroke-width':2, opacity:0}, g2));
+  const P = pts.map(p => el('circle', {cx:p.x, cy:p.y, r:9, fill:p.c, opacity:0}, g2));
+  const red = el('circle', {cx:pts[5].x, cy:pts[5].y, r:16, fill:'none', stroke:C.red, 'stroke-width':5, opacity:0}, g2);
+  const dbLabel = txt(920, 870, '', 22, C.green, 'mono', 'middle');
+  const order = [shop, coll, ingest, db, gh, det, eng, agent, act, ui];
+  const pk = []; for (let i = 0; i < 18; i++) pk.push(el('circle', {r:7, fill:C.green, opacity:0}, packets));
+  RENDER = (t) => {
+    const keys = ['shop','coll','ingest','db','gh','det','eng','agent','act','ui'];
+    const tt = Object.fromEntries(keys.map((k, i) => [k, B(k, 1 + i * 2.6)]));
+    chap.setAttribute('opacity', prog(t, 0.2, 0.6));
+    order.forEach((o, i) => {
+      const k = prog(t, tt[keys[i]], 0.6);
+      o.g.setAttribute('opacity', 0.15 + 0.85 * k);
+      const last = keys.filter(kk => t >= tt[kk]).pop();
+      o.r.setAttribute('stroke-width', keys[i] === last ? 6 : 3);
+      o.r.setAttribute('stroke', keys[i] === last ? (keys[i] === 'db' ? C.green : C.plum) : (keys[i] === 'db' ? C.green : C.mist));
+    });
+    const arrowAt = {shop_coll:'coll', coll_ing:'ingest', ing_db:'db', gh_db:'gh', db_det:'det', db_eng:'eng', db_agent:'agent', db_act:'act', db_ui:'ui'};
+    for (const a in A) A[a].setAttribute('opacity', prog(t, tt[arrowAt[a]] - 0.2, 0.5));
+    // the graph grows inside FalkorDB as data arrives
+    const grow = prog(t, tt.db, Math.max(1.5, (tt.det - tt.db)));
+    P.forEach((p, i) => p.setAttribute('opacity', clamp(grow * 26 - i)));
+    E.forEach((e, i) => e.setAttribute('opacity', 0.5 * clamp(grow * edges.length - i)));
+    const blame = prog(t, tt.eng, 0.6);
+    red.setAttribute('opacity', blame); red.setAttribute('r', 16 + 4 * Math.sin(t * 5));
+    dbLabel.textContent = t >= tt.eng ? 'root cause found: one node' : t >= tt.det ? 'alarms on 4 nodes' : t >= tt.db ? 'services · calls · teams · changes · code' : '';
+    dbLabel.setAttribute('opacity', prog(t, tt.db + 0.4, 0.5));
+    // packets along the input path, then out to the steps
+    const path = [[270, 340], [270, 400], [270, 550], [270, 610], [460, 685], [620, 640]];
+    pk.forEach((c, i) => {
+      const on = prog(t, tt.ingest, 0.5);
+      const ph = ((t * 0.18 + i / pk.length) % 1) * (path.length - 1);
+      const s = Math.floor(ph), f = ph - s;
+      const a = path[s], b = path[Math.min(s + 1, path.length - 1)];
+      c.setAttribute('cx', a[0] + (b[0] - a[0]) * f); c.setAttribute('cy', a[1] + (b[1] - a[1]) * f);
+      c.setAttribute('opacity', on * 0.85);
+    });
+  };
+}
+
+/* ------------------------------------------------------------------ end */
+function buildEnd() {
+  S.innerHTML = '';
+  el('rect', {x:0, y:0, width:1920, height:1080, fill:C.pine});
+  const lines = [
+    [430, 'RootCause', 130, C.paper, 'serif'],
+    [560, 'From a storm of alarms to one cause, one fix, one pull request.', 38, '#D6DCD3', 'sans'],
+    [700, 'Try it: http://3.234.90.242', 34, '#BFE3CF', 'sans'],
+    [756, 'Code: github.com/rootcause-1/rootcause', 34, '#BFE3CF', 'sans'],
+    [880, 'Graph Hacks 2026  ·  FalkorDB  ·  Track 01: Agents That Act on Connected Data', 26, '#9FA89C', 'sans'],
+  ].map(([y, s, sz, col, cls]) => txt(960, y, s, sz, col, cls, 'middle'));
+  RENDER = (t) => lines.forEach((l, i) => l.setAttribute('opacity', prog(t, 0.2 + i * 0.35, 0.7)));
+}
+
+window.setup = (scene, beats) => { BEATS = beats || {};
+  ({intro: buildIntro, title: buildTitle, pipeline: buildPipeline, end: buildEnd})[scene](); RENDER(0); return true; };
+window.frame = (t) => { RENDER(t); return true; };
+</script>
+</body></html>
