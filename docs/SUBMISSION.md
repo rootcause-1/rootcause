@@ -1,6 +1,6 @@
 # Submission text (copy-paste)
 
-Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB). Fill the two links marked TODO before submitting.
+Graph Hacks: Context for AI Agents (WeMakeDevs × FalkorDB). Fill the video link marked TODO before submitting.
 
 **Project name:** RootCause
 
@@ -40,6 +40,8 @@ betweenness. Without FalkorDB nothing groups, ranks, proves, predicts or remembe
 alarm 53 %; Gemini with only a flat alarm table 80 %, but it missed the broken connection only the graph could see).
 207 tests on a real FalkorDB, 7 golden replays. Live runs opened real pull requests on our fork, merged by a person.
 
+**Blog post (side prize):** draft in docs/BLOG.md.
+
 **Built with.** Python 3.12, FastAPI, FalkorDB v4.22.1, OpenTelemetry Demo + Collector, MCP Python SDK (FastMCP),
 Google Gemini, React + Vite + TypeScript + Tailwind, Docker, AWS EC2.
 
@@ -50,4 +52,8 @@ people, runbooks) and the public OpenTelemetry Demo source code.
 docs/AI_DISCLOSURE.md with what a person verified. RootCause itself uses Google Gemini at runtime. The demo video's
 draft narration is the open-source Kokoro-82M voice.
 
-**Team:** TODO: names and who did what (see README › Team).
+**Team**
+- Yash Aggarwal: live integration with the OpenTelemetry Demo, detection fixes from the real runs, chaos evaluation,
+  replay deployment on AWS, docs and video.
+- Shambhvi: original design and implementation of every milestone: graph model and queries, ingest, engine, actions,
+  agent and MCP server, UI.
