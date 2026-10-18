@@ -74,7 +74,7 @@ def text_of(content: dict[str, Any]) -> str:
     return "".join(p.get("text", "") for p in content.get("parts", []) if not p.get("thought"))
 
 
-async def ask(s: Settings, prompt: str, system: str | None = None) -> str:
+async def ask(s: Settings, prompt: str, system: str | None = None, timeout: float = 60) -> str:
     """Single-turn text question."""
-    content = await generate(s, [{"role": "user", "parts": [{"text": prompt}]}], system=system)
+    content = await generate(s, [{"role": "user", "parts": [{"text": prompt}]}], system=system, timeout=timeout)
     return text_of(content).strip()

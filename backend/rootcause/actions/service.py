@@ -72,7 +72,8 @@ def _llm_writer(s: Settings) -> code_fix.Writer:
     from rootcause import llm
 
     async def write(system: str, user: str) -> str:
-        return await llm.ask(s, user, system=system)
+        # writing a code change can take Gemini over a minute (seen live on 18 Oct: body read timed out at 60 s)
+        return await llm.ask(s, user, system=system, timeout=180)
 
     return write
 
@@ -288,9 +289,10 @@ class ActionService:
                 self.db, inc.get("members") or [], inc.get("root_target") or "")
             pr = await code_fix.open_fix_pr(self.db, self.s, inc, self.writer or _llm_writer(self.s))
         except Exception as exc:
-            log.warning("fix PR for %s failed: %s", a["incident_id"], exc)
-            await self.db.run("set_action_props", id=a["id"], props={"status": "failed", "error": str(exc)[:300]})
-            await self._emit("action", {"id": a["id"], "status": "failed", "error": str(exc)})
+            err = str(exc) or type(exc).__name__  # e.g. httpx.ReadTimeout has no message
+            log.warning("fix PR for %s failed: %s", a["incident_id"], err)
+            await self.db.run("set_action_props", id=a["id"], props={"status": "failed", "error": err[:300]})
+            await self._emit("action", {"id": a["id"], "status": "failed", "error": err})
             return
         await self.db.run("set_action_props", id=a["id"], props={
             "status": "executed", "executed_ts": now_ms(), "result": dumps(pr), "pr_url": pr["url"],
