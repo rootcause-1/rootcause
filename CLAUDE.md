@@ -41,7 +41,7 @@ The full product spec is `docs/PRD.md` (exported from the team's PRD doc). **If 
 | Backend | Python 3.12, FastAPI, uvicorn, asyncio, `httpx`, `pydantic` v2, `pyyaml` |
 | Graph | FalkorDB (`falkordb/falkordb:v4.22.1`, pinned), Python client `falkordb` (use `falkordb.asyncio` in async code) |
 | MCP | Official Python MCP SDK (`mcp`), `FastMCP`, transports: stdio and streamable HTTP |
-| LLM | Google Gemini over its REST API (`backend/rootcause/llm.py`, httpx, no SDK), model `RC_LLM_MODEL` (default `gemini-2.5-flash`), temperature 0. Switched from Claude on 18 Oct at the team's request. |
+| LLM | Google Gemini over its REST API (`backend/rootcause/llm.py`, httpx, no SDK), model `RC_LLM_MODEL` (default `gemini-3.8-flash`), temperature 0. Switched from Claude on 18 Oct at the team's request. |
 | Containers | Docker SDK for Python (`docker`) via mounted `/var/run/docker.sock` |
 | UI | React 18 + Vite + TypeScript, plain SVG company map (isometric boxes) + popup narrator (Three.js scene removed 16 Oct at Shambhvi's request), Tailwind (warm paper theme, Newsreader + Inter + JetBrains Mono), SSE (`EventSource`) |
 | Tests | `pytest`, `pytest-asyncio`, `ruff`; FalkorDB test container for integration tests |
@@ -149,7 +149,7 @@ PROMETHEUS_URL=http://prometheus:9090     # VERIFY service name/port inside demo
 DEMO_REPO_PATH=../opentelemetry-demo
 FLAGD_CONFIG_PATH=${DEMO_REPO_PATH}/src/flagd/demo.flagd.json   # VERIFY
 GEMINI_API_KEY=
-RC_LLM_MODEL=gemini-2.5-flash
+RC_LLM_MODEL=gemini-3.8-flash
 RC_AGENT_MODE=autopilot          # autopilot | llm
 PAGER_WEBHOOK_URL=               # optional (Discord/Slack incoming webhook)
 ```

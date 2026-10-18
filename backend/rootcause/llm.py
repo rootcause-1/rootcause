@@ -2,7 +2,7 @@
 
 Used by the LLM agent (agent/loop.py, with function calling over our MCP tools), report narration, the
 `llm_no_graph` chaos baseline and "Fix it in code". Key: GEMINI_API_KEY. Model: RC_LLM_MODEL
-(default gemini-2.5-flash). Temperature 0 for repeatable answers. No graph queries here.
+(default gemini-3.8-flash). Temperature 0 for repeatable answers. No graph queries here.
 """
 
 from __future__ import annotations

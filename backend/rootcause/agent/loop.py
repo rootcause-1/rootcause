@@ -4,7 +4,7 @@ Budget: 12 tool calls, 90 s. Every tool call is recorded as a (:Step) via agent/
 verdict JSON (same shape as autopilot). Write tools other than propose_action are not offered: the model can
 draft actions but never execute them.
 
-Model notes (Gemini API, rootcause/llm.py): model from RC_LLM_MODEL (default gemini-2.5-flash), temperature 0.
+Model notes (Gemini API, rootcause/llm.py): model from RC_LLM_MODEL (default gemini-3.8-flash), temperature 0.
 MCP tool schemas are translated to Gemini function declarations; the model's turns are appended unchanged
 (they may carry thought signatures), tool results go back as functionResponse parts.
 """

@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     demo_repo_path: str = "../opentelemetry-demo"
     flagd_config_path: str | None = None
     gemini_api_key: str = ""
-    rc_llm_model: str = "gemini-2.5-flash"
+    rc_llm_model: str = "gemini-3.8-flash"
     rc_agent_mode: str = "autopilot"  # autopilot | llm
     pager_webhook_url: str = ""
     github_token: str = ""  # fix-it-in-code PRs on code.pr_repo only
