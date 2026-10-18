@@ -1,5 +1,11 @@
 # AI-assistant disclosure
 
+**How we worked.** The idea, the product, the architecture and the graph model were ours, and so was every decision
+about what to build, what to change, what to cut and what to add. Claude Code (an AI coding assistant) wrote most of
+the code under our direction. We ran it against the real OpenTelemetry Demo, reviewed the results, sent it back when
+something was wrong, and verified each module (the right-hand column below). RootCause itself uses Google Gemini at
+runtime; that is a product feature, not a coding assistant.
+
 Format: `date · module · what Claude Code did · what a human verified`. Humans fill in the last column.
 
 - 2026-10-15 · repo skeleton, Makefile, config/*.yaml, infra/* · Claude Code wrote the initial versions from CLAUDE.md · Yash & Shambhvi: ran the tests and the live demo, read the module and can explain it
