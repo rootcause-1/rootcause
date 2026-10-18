@@ -2,6 +2,10 @@
 
 ## Final version (18 Oct): the real run, ending with a real pull request
 
+**Recorded:** the cut in `video/out/rootcause-demo-draft.mp4` was made from a live run with the narration in
+`video/live/voice.py` (`LINES`, slightly tightened from the table below; scorecard numbers from batch 4).
+How it was filmed and how to swap in your own voice: `video/live/README.md`.
+
 Everything on screen is the real system on one laptop: the OpenTelemetry Demo shop, RootCause in LIVE mode with the
 Gemini agent, our fork on GitHub (`yash4428/opentelemetry-demo`) and the FalkorDB Browser. The public replay site only
 appears on the end card. Illustrated version with screenshots: the "RootCause Field Guide" artifact (ask Yash for the link).

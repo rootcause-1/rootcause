@@ -83,7 +83,7 @@ human to approve, applies the fix, checks recovery, writes the report and rememb
 | Chat narrator | WhatsApp-style chat driven by real incident state; "Yes, fix it"; demo autoplay in replay only. | live |
 | Tabs | Break something, Predict, Memory, Reports, **Your company**. | live (company: new) |
 | Connect your GitHub | Codebase tab: shallow clone + read of a public repo → CodeModule/IMPLEMENTS/DECLARES/READ_IN/TOUCHED in the graph; chat shows the code behind the root cause (file:line link); agent `read_code` step; code-vs-traffic drift. | new, unit + graph tests, checked end to end on the real API |
-| Fix it in code | After recovery the chat offers a pull request: Gemini writes a find/replace fix for the file where the root reads the changed flag; RootCause opens it on our fork with the graph evidence; `(:PullRequest)-[:FIXES]->(:Incident)`. | live with keys: opened yash4428/opentelemetry-demo#1 on 18 Oct; off on the public site |
+| Fix it in code | After recovery the chat offers a pull request: Gemini writes a find/replace fix for the file where the root reads the changed flag; RootCause opens it on our fork with the graph evidence; `(:PullRequest)-[:FIXES]->(:Incident)`. | live with keys: opened yash4428/opentelemetry-demo#1 and #2 on 18 Oct (#2 merged by a person, in the demo video); off on the public site |
 | Your company | Teams, on-call, ownership, journeys, runbooks + automation URLs, edited in the graph (ingestion reads journey routes from the graph); export seed.yaml. | new |
 
 ## 3. Is FalkorDB used properly? Yes. The details:

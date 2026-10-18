@@ -336,3 +336,18 @@ already defined at line 32, so the patch is valid). Bug found by this run: the P
 the graph, so its body showed the evidence path as just `payment`. Fixed (`730d11c`): the PR body uses the verdict's
 diagnosis-time path, like the report; the end-to-end graph test now covers it. `make lint test` → 206 passed.
 
+## 18 Oct (afternoon): the live demo-video run
+Recorded end to end on the live stack (Gemini agent) for the video (`video/live/`, README there). What happened:
+- Reset → the company map filled from live traces (1 service, then all 19, within seconds); Codebase scan of the fork
+  on camera (20 services with code, 26,514 lines, 12 languages, 22 flag reads).
+- `paymentFailure` → 100% in the demo's own flag page; the shop's checkout answered `422 PAYMENT_FAILED`.
+- Take 1 (INC-0001): diagnosis + verified revert fine, but **Fix it in code failed**: Gemini's code-change answer took
+  over 60 s and httpx raised a blank `ReadTimeout`. Fixed in `a8de317` (writer timeout 180 s, readable errors).
+- Take 2 (INC-0004, after an API restart; two 25-second queue incidents opened and closed by themselves first):
+  root cause payment, confidence 1.00, "looks like a past incident (100 % alike)", code line `src/payment/charge.js:40`;
+  revert approved, all 4 alarms cleared in 85 s; Gemini wrote the change in 27 s and RootCause opened
+  **https://github.com/yash4428/opentelemetry-demo/pull/2** (description now carries the full evidence path
+  `frontend-proxy → frontend → checkout → payment`, the `730d11c` fix). **Yash merged it.**
+- Found: the live UI container was built before the Gemini switch, so two chat lines said "Claude" (backend used Gemini).
+  Rebuilt `rootcause-ui`. Also found and fixed `set_root_cause` linking a same-named Container (`739b49c`).
+

@@ -33,7 +33,11 @@ forms its own incident; the UI is built for laptop/desktop, not phones; the page
 
 ## 2. What is left today, in order, with an owner
 
-### 2.1 Video (≤ 3 min) — the one thing judges need most. Owner: Shambhvi (Windows) or Yash (screen recording)
+### 2.1 Video (≤ 3 min) — the one thing judges need most. Owner: Yash
+**A full 2:31 cut of a real live run exists**: `video/out/rootcause-demo-draft.mp4` on Yash's Mac (gitignored; macOS
+voice). To use your own voice: `video/live/README.md` (record 11 lines, `python3 voice.py --mine DIR`, re-render).
+Then upload (YouTube unlisted) and replace `_TODO: add YouTube link_` in `README.md`. The older options below remain
+as fallbacks.
 - **Option A, Shambhvi's pipeline** (Windows: built-in TTS voices + Playwright + ffmpeg):
   `pip install playwright imageio-ffmpeg && playwright install chromium`, then
   `.venv/Scripts/python video/make_video.py` → `video/out/rootcause-demo.mp4`. It records the **public site**

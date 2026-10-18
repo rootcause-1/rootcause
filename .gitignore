@@ -13,3 +13,6 @@ data/*
 # video build output (regenerate with video/make_video.py)
 video/build/
 video/out/
+video/live/footage/
+video/live/voice/
+video/live/out/
