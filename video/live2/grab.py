@@ -5,7 +5,7 @@ from PIL import Image
 out, specs = sys.argv[1], sys.argv[2:]
 ims = []
 for s in specs:
-    c, when = s.split("@"); d = Path("footage3") / c
+    c, when = s.split("@"); d = Path(__file__).parent / "footage3" / c
     files = sorted(d.glob("*.jpg")); ts = [f.stat().st_mtime for f in files]
     t = time.mktime(time.strptime(datetime.date.today().isoformat() + " " + when, "%Y-%m-%d %H:%M:%S"))
     ims.append(Image.open(files[max(0, bisect.bisect_right(ts, t) - 1)]).convert("RGB"))

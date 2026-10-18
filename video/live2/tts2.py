@@ -5,7 +5,7 @@ import numpy as np, soundfile as sf
 from pathlib import Path
 from kokoro_onnx import Kokoro
 from script2 import SEGMENTS, speak
-VOICE, SPEED, GAP = "af_heart", 1.18, 0.22
+VOICE, SPEED, GAP = "af_heart", 1.27, 0.14
 out = Path(__file__).parent / "voice2"; out.mkdir(exist_ok=True)
 tj = out / "timing.json"
 timing = json.loads(tj.read_text()) if tj.exists() else {}

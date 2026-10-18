@@ -42,12 +42,18 @@ SEGMENTS = [
         "It even flags where the code and the live traffic disagree.",
     ]),
     ("layers", [
-        "Inside FalkorDB, the code layer now sits right on top of the live service graph.",
+        "Inside FalkorDB, the code layer now sits right on top of the live service graph,",
+        "with every module linked to the service it runs as.",
+    ]),
+    ("apis", [
+        "It maps the APIs too: every gRPC service in the code, and the module that serves it,",
+        "every dependency the modules declare,",
+        "and where live traffic disagrees: here, a production call the code never declares.",
     ]),
     ("break", [
         "Now we break it the way real outages start: someone changes a setting.",
         "Payment failure goes to one hundred percent,",
-        "and checkout starts rejecting customers. Nobody tells RootCause.",
+        "A customer tries to pay, and the shop's API rejects it. Nobody tells RootCause.",
     ]),
     ("alarms", [
         "Watch the steps at the top.",
@@ -78,26 +84,26 @@ SEGMENTS = [
     ]),
     ("pr", [
         "The failing code is still there, so RootCause offers a code fix.",
-        "It reads the file from GitHub, and Gemini writes the change.",
+        "I say yes.",
+        "It reads the exact file from GitHub, Gemini writes a small change, and RootCause opens a pull request on our fork.",
     ]),
     ("github_pr", [
-        "Here's the real pull request, with the graph's evidence in the description,",
-        "and a one-line change.",
-        "RootCause never merges anything itself.",
+        "Here's that pull request on GitHub: Gemini's explanation, plus the evidence from the graph: root cause, blame path, change and impact.",
+        "And the change itself, in the payment code.",
     ]),
     ("merge", [
-        "A person reviews it, and merges it.",
+        "A person reviews the change and merges it. RootCause never merges anything by itself.",
     ]),
     ("onegraph", [
-        "And it's all one graph: the alerts and their incident,",
-        "every step the agent took,",
-        "and the pull request, linked to the code it changed.",
+        "And it's all one graph in FalkorDB: the alerts and their incident,",
+        "every step the agent took, and what it cited,",
+        "and the pull request, linked to the root cause and the code it changed.",
     ]),
     ("tabs", [
-        "There's more. Predict shows what would break, before it breaks.",
-        "Memory keeps every incident and the fix that worked.",
-        "Reports come straight from the graph.",
-        "And Your company sets up teams, on-call and runbooks.",
+        "There's more. Predict walks the graph upstream to show what would break, before it breaks.",
+        "Memory keeps every incident and the fix that worked, to suggest it first next time.",
+        "Reports are written straight from the graph.",
+        "And Your company sets up teams, on-call and runbooks, all in FalkorDB.",
     ]),
     ("score", [
         "We tested it blind: fifteen random faults, scored by code.",
